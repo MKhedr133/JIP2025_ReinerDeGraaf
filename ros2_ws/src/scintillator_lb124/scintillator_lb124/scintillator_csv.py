@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+"""
+CPS → CSV logger (default saved inside the package)
+==================================================
+Subscribes to `/scintillator/cps` and writes `time,cps` to a CSV file.
+By default the file is placed in the installed package share directory under `csv/`.
+
+Parameters
+- output_dir (string, default: <pkg_share>/csv)
+- file_prefix (string, default: "scint_log_")
+- add_header (bool, default: true)
+"""
+
+import os, csv
+from datetime import datetime
+
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import Float32
+from ament_index_python.packages import get_package_share_directory
+
+
+class ScintillatorCsvNode(Node):
+    def __init__(self):
+        super().__init__("scintillator_csv")
+        # Resolve <pkg_share>/csv as the default output directory
+        default_dir = os.path.join(get_package_share_directory("scintillator_lb124"), "csv")
+        os.makedirs(default_dir, exist_ok=True)
+
+        self.declare_parameter("output_dir", default_dir)
+        self.declare_parameter("file_prefix", "scint_log_")
+        self.declare_parameter("add_header", True)
+
+        out_dir = str(self.get_parameter("output_dir").value)
+        prefix = str(self.get_parameter("file_prefix").value)
+        add_header = bool(self.get_parameter("add_header").value)
+
+        fname = f"{prefix}{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        self.path = os.path.join(out_dir, fname)
+        self.fh = open(self.path, "w", newline="")
+        self.writer = csv.writer(self.fh)
+
+        if add_header:
+            self.writer.writerow(["time", "cps"])
+            self.fh.flush()
+
+        self.create_subscription(Float32, "/scintillator/cps", self.on_cps, 10)
+        self.get_logger().info(f"Logging CPS to {self.path}")
+
+    def on_cps(self, msg: Float32):
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.writer.writerow([now, f"{msg.data:.6f}"])
+        self.fh.flush()
+
+    def destroy_node(self):
+        try:
+            self.fh.flush(); self.fh.close()
+        except Exception:
+            pass
+        super().destroy_node()
+
+
+def main():
+    rclpy.init()
+    node = ScintillatorCsvNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()
