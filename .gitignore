@@ -1,93 +1,34 @@
-# Python
-__pycache__/
-*.py[cod]
-*.so
-*.egg
-*.egg-info/
-dist/
-build/
-.eggs/
-*.pyo
-*.pyd
-.pytest_cache/
-.mypy_cache/
-
-
-# --- ROS 2 (colcon/ament) ---
+# ROS 2 (colcon/ament)
 ros2_ws/build/
 ros2_ws/install/
 ros2_ws/log/
-*.pyc
-*.pyo
-*.pyd
-__pycache__/
-
-# colcon test results
 test_results/
 *.test
 *.xunit.xml
 
-# RViz, maps, and Gazebo artifacts
+# RViz / maps / sim artifacts (keep if you don't want these tracked)
 *.rviz
 *.pgm
 *.yaml
 *.world
 *.model
 
-# --- Python ---
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Distribution / packaging
 .Python
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
 .eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
 *.egg-info/
-.installed.cfg
-*.egg
-
-# Unit test / coverage reports
-.coverage
-*.cover
-*.py,cover
-.cache
-nosetests.xml
-coverage.xml
-*.prof
-*.log
 .pytest_cache/
 .mypy_cache/
-.dmypy.json
-dmypy.json
+.coverage
+.cache
 
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Jupyter
-.ipynb_checkpoints
-
-# --- VSCode / IDEs ---
+# IDE / OS
 .vscode/
 .idea/
-*.swp
-
-# --- OS junk ---
 .DS_Store
 Thumbs.db
