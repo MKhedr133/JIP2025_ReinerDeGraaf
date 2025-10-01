@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'simba_navigation'
+package_name = 'keyboard-listener'
 
 setup(
     name=package_name,
@@ -13,14 +13,18 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='Mohamed Khedr',
-    maintainer_email='mkhedr@tudelft.nl',
-    description='TODO: Package description',
-    license='Apache-2.0',
-    tests_require=['pytest'],
+    maintainer='joost',
+    maintainer_email='jevanbusschbach@gmail.com',
+    description='Node that is responsible for listening to keyboard inputs',
+    license='MIT',
+    extras_require={
+        'test': [
+            'pytest',
+        ],
+    },
     entry_points={
         'console_scripts': [
-            'nav_helper = simba_navigation.nav_helper:main'
+            'KeyboardListener = keyboard-listener.KeyboardListener:main'
         ],
     },
 )
