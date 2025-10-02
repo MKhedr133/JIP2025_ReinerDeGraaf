@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'main_controller'
+package_name = 'simba_bringup'
 
 setup(
     name=package_name,
@@ -10,12 +10,13 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/launch', ['simba_bringup/simba_launch.py']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='joost',
     maintainer_email='jevanbusschbach@gmail.com',
-    description='TODO: Package description',
+    description='Launches everything needed for the simba robot',
     license='TODO: License declaration',
     extras_require={
         'test': [
@@ -24,7 +25,6 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'main_controller = main_controller.main_controller:main',
         ],
     },
 )

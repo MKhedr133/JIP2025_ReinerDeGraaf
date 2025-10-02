@@ -1,3 +1,24 @@
+"""
+Main Controller Node
+
+This ROS 2 node serves as the main control center of the application. It listens to incoming data from other nodes 
+and makes decisions based on the received information. Specifically, it subscribes to the `/key_input` topic, 
+which provides keyboard inputs, and updates its internal state accordingly.
+
+### Functionality:
+- Subscribes to the `/key_input` topic to receive keyboard inputs.
+- Maintains an internal state (`IDLE` by default).
+- Changes the state to `TRIGGERED` when the `t` key is received.
+- Logs all received inputs and state changes for debugging and monitoring.
+
+### Subscribed Topics:
+- `/key_input` (std_msgs/String): Receives keyboard inputs as string messages.
+
+### States:
+- `IDLE`: The initial state of the node.
+- `TRIGGERED`: The state changes to this when the `t` key is received.
+
+"""
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
