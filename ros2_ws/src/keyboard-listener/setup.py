@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'KeyboardListener = keyboard_listener.KeyboardListenerNode:main'
+            'keyboard_listener = keyboard_listener.keyboard_listener:main'
         ],
     },
 )
