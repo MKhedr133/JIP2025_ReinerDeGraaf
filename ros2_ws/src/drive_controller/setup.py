@@ -24,7 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'drive_control_node = drive_control_pkg.drive_control_node:main',
+            'drive_controller = drive_controller.drive_controller:main',
         ],
     },
 )

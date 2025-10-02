@@ -23,6 +23,8 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 from nav_msgs.msg import Odometry
+from irobot_create_msgs.msg import WheelTicks
+from std_msgs.msg import Bool
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy
 import math
 
@@ -37,7 +39,9 @@ class MainControllerNode(Node):
 
         # Keep track of Distance Travelled in EXPERIMENT state
         self.startpose = (0.0,0.0,0.0) # TODO: save this in a better data format
-
+        self.startTickLeft = 0
+        self.startTickRight = 0
+        
         # Subscriber to /key_input
         self.keyboardSubscriber = self.create_subscription(
             String,
@@ -59,10 +63,17 @@ class MainControllerNode(Node):
             self.odom_callback,
             qos)
         
+        # Subscriber to /wheel_ticks
+        self.tickSubscriber = self.create_subscription(
+            WheelTicks,
+            'wheel_ticks',
+            self.tick_callback,
+            qos)
+        
         # Publish whether MANUAL control is enabled on /manual_control_enabled
-        self.manualControlEnabled = False
+        self.manualControlEnabled = True
         self.manualControlPublisher = self.create_publisher(
-            bool,
+            Bool,
             'manual_control_enabled',
             10
         )
@@ -71,10 +82,10 @@ class MainControllerNode(Node):
         key = msg.data.strip()
         self.get_logger().info(f"Received key input: '{key}'")
 
-        if key == 't':
+        if key == 'y':
             self.state = 'EXPERIMENT'
             self.get_logger().info(f"State changed to: {self.state}. Starting experiment.")
-        elif key == 'g':
+        elif key == 'h':
             self.state = 'IDLE'
             self.get_logger().info(f"State changed to: {self.state}. Stopping experiment.")
         elif key == 'm':
@@ -92,12 +103,22 @@ class MainControllerNode(Node):
             # Log how much distance we've travelled
             distance_travelled = math.sqrt((msg.pose.pose.position.x - self.startpose[0]) ** 2 +
                                   (msg.pose.pose.position.y - self.startpose[1]) ** 2) ** 0.5
-            self.get_logger().info(f"Distance travelled in EXPERIMENT state: {distance_travelled:.2f} meters")
+            # self.get_logger().info(f"Distance travelled in EXPERIMENT state: {distance_travelled:.2f} meters")
         elif self.state == 'IDLE':
             # Update startpose to current position
             self.startpose = (msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z)
-        return
-
+        
+    def tick_callback(self, msg: WheelTicks):
+        if self.state == 'EXPERIMENT':
+            ticks = ((msg.ticks_left - self.startTickLeft), (msg.ticks_right - self.startTickRight))
+            ticks_travelled = (ticks[0] + ticks[1]) / 2.0
+            dist_per_tick = (2.0 * math.pi * 72.0) / 508.8  # in mm   
+            # Log wheel ticks
+            self.get_logger().info(f"Dist travelled is {ticks_travelled * dist_per_tick} mm. Ticks: {ticks_travelled}. Dist per tick: {dist_per_tick} mm")
+        elif self.state == 'IDLE':
+            # Update start ticks to current ticks
+            self.startTickLeft = msg.ticks_left
+            self.startTickRight = msg.ticks_right
 
 def main(args=None):
     rclpy.init(args=args)

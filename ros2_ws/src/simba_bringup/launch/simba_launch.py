@@ -19,7 +19,7 @@ def generate_launch_description():
         ),
         Node(
             package='drive_controller',
-            executable='drive_control_node',
+            executable='drive_controller',
             name='drive_controller',
             output='screen'
         ),
