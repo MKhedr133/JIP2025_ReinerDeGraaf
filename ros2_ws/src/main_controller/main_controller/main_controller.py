@@ -58,8 +58,14 @@ class MainControllerNode(Node):
             'odom',
             self.odom_callback,
             qos)
-
-
+        
+        # Publish whether MANUAL control is enabled on /manual_control_enabled
+        self.manualControlEnabled = False
+        self.manualControlPublisher = self.create_publisher(
+            bool,
+            'manual_control_enabled',
+            10
+        )
 
     def key_input_callback(self, msg: String):
         key = msg.data.strip()
@@ -71,6 +77,11 @@ class MainControllerNode(Node):
         elif key == 'g':
             self.state = 'IDLE'
             self.get_logger().info(f"State changed to: {self.state}. Stopping experiment.")
+        elif key == 'm':
+            # Toggle manual control
+            self.manualControlEnabled = not (self.manualControlEnabled)
+            self.manualControlPublisher.publish(self.manualControlEnabled)
+            self.get_logger().info(f"Manual control {'enabled' if self.manualControlEnabled else 'disabled'}. Current state: {self.state}")
         else:
             self.get_logger().info(f"No state change (current state: {self.state})")
 
