@@ -22,6 +22,9 @@ which provides keyboard inputs, and updates its internal state accordingly.
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
+from nav_msgs.msg import Odometry
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy
+import math
 
 
 class MainControllerNode(Node):
@@ -32,23 +35,57 @@ class MainControllerNode(Node):
         self.state = 'IDLE'
         self.get_logger().info(f"Initial state: {self.state}")
 
+        # Keep track of Distance Travelled in EXPERIMENT state
+        self.startpose = (0.0,0.0,0.0) # TODO: save this in a better data format
+
         # Subscriber to /key_input
-        self.subscription = self.create_subscription(
+        self.keyboardSubscriber = self.create_subscription(
             String,
-            '/key_input',
+            'key_input',
             self.key_input_callback,
             10
         )
+
+        # make sure QOS lines up with roomba stuff
+        qos = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            depth=10
+        )
+
+        # Subscriber to /odom
+        self.odomSubscriber = self.create_subscription(
+            Odometry,
+            'odom',
+            self.odom_callback,
+            qos)
+
+
 
     def key_input_callback(self, msg: String):
         key = msg.data.strip()
         self.get_logger().info(f"Received key input: '{key}'")
 
         if key == 't':
-            self.state = 'TRIGGERED'
-            self.get_logger().info(f"State changed to: {self.state}")
+            self.state = 'EXPERIMENT'
+            self.get_logger().info(f"State changed to: {self.state}. Starting experiment.")
+        elif key == 'g':
+            self.state = 'IDLE'
+            self.get_logger().info(f"State changed to: {self.state}. Stopping experiment.")
         else:
             self.get_logger().info(f"No state change (current state: {self.state})")
+
+    def odom_callback(self, msg: Odometry):
+        if self.state == 'EXPERIMENT':
+            # Extract position from the Odometry message
+            position = msg.pose.pose.position
+            # Log how much distance we've travelled
+            distance_travelled = math.sqrt((msg.pose.pose.position.x - self.startpose[0]) ** 2 +
+                                  (msg.pose.pose.position.y - self.startpose[1]) ** 2) ** 0.5
+            self.get_logger().info(f"Distance travelled in EXPERIMENT state: {distance_travelled:.2f} meters")
+        elif self.state == 'IDLE':
+            # Update startpose to current position
+            self.startpose = (msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z)
+        return
 
 
 def main(args=None):
