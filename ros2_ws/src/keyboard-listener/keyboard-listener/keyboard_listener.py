@@ -5,9 +5,9 @@ from pynput import keyboard
 import threading
 
 
-class KeyboardListener(Node):
+class KeyboardListenerNode(Node):
     def __init__(self):
-        super().__init__('keyboard_listener_node')
+        super().__init__("KeyboardListener")
         self.publisher_ = self.create_publisher(String, 'key_input', 10)    #publisher for key inputs
         self.get_logger().info("Keyboard listener node started. Press ESC to quit.")
 
@@ -37,16 +37,10 @@ class KeyboardListener(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = KeyboardListener()
+    node = KeyboardListenerNode()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
-
-
-if __name__ == '__main__':
-    main()
-
-
 
 
 if __name__ == '__main__':
