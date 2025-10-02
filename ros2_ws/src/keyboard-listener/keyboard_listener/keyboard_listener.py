@@ -1,3 +1,20 @@
+"""
+Keyboard Listener Node
+
+This ROS 2 node listens for keyboard inputs and publishes the pressed keys to the `/key_input` topic.
+It uses the `pynput` library to capture keyboard events and publishes them as `std_msgs/String` messages.
+
+### Functionality:
+- Captures alphanumeric keys and special keys (e.g., space, escape).
+- Publishes each key press to the `/key_input` topic.
+- Shuts down the node when the `ESC` key is pressed.
+
+### Published Topics:
+- `/key_input` (std_msgs/String): Publishes the string representation of the pressed key.
+
+"""
+
+
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
@@ -22,13 +39,13 @@ class KeyboardListenerNode(Node):
             except AttributeError:
                 key_str = str(key)  # Special keys (Key.esc, Key.space, etc.)
 
-            self.get_logger().info(f"Key pressed: {key_str}")
+            # self.get_logger().info(f"Key pressed: {key_str}")
             msg = String()
             msg.data = key_str
             self.publisher_.publish(msg)    #publish the key press
 
             if key == keyboard.Key.esc:
-                self.get_logger().info("ESC pressed. Shutting down.")
+                # self.get_logger().info("ESC pressed. Shutting down.")
                 rclpy.shutdown()
 
         with keyboard.Listener(on_press=on_press) as listener:
