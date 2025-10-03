@@ -22,7 +22,6 @@ class DriveControlNode(Node):
             self.control_enabled_callback,
             10
         )
-        self.controlEnabled = True
 
         self.movePublisher = self.create_publisher(
             Twist,
@@ -30,6 +29,7 @@ class DriveControlNode(Node):
             10
         )
 
+        self.controlEnabled = True # Whether manual control is enabled
         self.lin_speed = 0.1  # Linear speed
         self.ang_speed = 0.5  # Angular speed
 
@@ -43,7 +43,7 @@ class DriveControlNode(Node):
         msg.angular.z = speed
         self.movePublisher.publish(msg)
 
-    def control_enabled_callback(self, msg: bool):
+    def control_enabled_callback(self, msg: Bool):
         self.controlEnabled = msg.data
         if msg.data:
             self.get_logger().info("Manual control enabled")
@@ -64,13 +64,13 @@ class DriveControlNode(Node):
             elif msg.data == 'd':
                 self.rotate(-self.ang_speed)
             elif msg.data == 'r':
-                lin_speed += 0.01
+                self.lin_speed += 0.01
             elif msg.data == 'f':
-                lin_speed = max(0.01, self.lin_speed - 0.01)
+                self.lin_speed = max(0.01, self.lin_speed - 0.01)
             elif msg.data == 't':
-                ang_speed += 0.01
+                self.ang_speed += 0.01
             elif msg.data == 'g':
-                ang_speed = max(0.01, self.ang_speed - 0.01)
+                self.ang_speed = max(0.01, self.ang_speed - 0.01)
         except AttributeError:
             print('Special key {0} pressed'.format(msg.data))
 

@@ -91,7 +91,9 @@ class MainControllerNode(Node):
         elif key == 'm':
             # Toggle manual control
             self.manualControlEnabled = not (self.manualControlEnabled)
-            self.manualControlPublisher.publish(self.manualControlEnabled)
+            msg_flag = Bool()
+            msg_flag.data = self.manualControlEnabled
+            self.manualControlPublisher.publish(msg_flag)
             self.get_logger().info(f"Manual control {'enabled' if self.manualControlEnabled else 'disabled'}. Current state: {self.state}")
         else:
             self.get_logger().info(f"No state change (current state: {self.state})")
