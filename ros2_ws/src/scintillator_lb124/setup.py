@@ -12,13 +12,12 @@ setup(
         (f'share/{package_name}/launch', ['launch/scintillator.launch.py']),
         (f'share/{package_name}/csv', []),
     ],
-    install_requires=['setuptools', 'pyserial'],
+    install_requires=['setuptools'],
     zip_safe=True,
     maintainer='Mohamed Khedr',
     maintainer_email='mkhedr@tudelft.nl',
     description='ROS 2 nodes for LB-124 scintillator: raw serial reader, CPS filter, CSV logger',
     license='Apache-2.0',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'scintillator_raw_node = scintillator_lb124.scintillator_raw:main',
