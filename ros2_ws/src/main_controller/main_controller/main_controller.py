@@ -98,6 +98,7 @@ class MainControllerNode(Node):
         else:
             self.get_logger().info(f"No state change (current state: {self.state})")
 
+    # PROBABLY DEPRECATED, Wheelticks more accurate!
     def odom_callback(self, msg: Odometry):
         if self.state == 'EXPERIMENT':
             # Extract position from the Odometry message
@@ -105,18 +106,18 @@ class MainControllerNode(Node):
             # Log how much distance we've travelled
             distance_travelled = math.sqrt((msg.pose.pose.position.x - self.startpose[0]) ** 2 +
                                   (msg.pose.pose.position.y - self.startpose[1]) ** 2) ** 0.5
-            # self.get_logger().info(f"Distance travelled in EXPERIMENT state: {distance_travelled:.2f} meters")
+            # self.get_logger().info(f"ODOM distance: {distance_travelled:.2f} meters")
         elif self.state == 'IDLE':
             # Update startpose to current position
             self.startpose = (msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z)
         
     def tick_callback(self, msg: WheelTicks):
         if self.state == 'EXPERIMENT':
-            ticks = ((msg.ticks_left - self.startTickLeft), (msg.ticks_right - self.startTickRight))
-            ticks_travelled = (ticks[0] + ticks[1]) / 2.0
-            dist_per_tick = (2.0 * math.pi * 72.0) / 508.8  # in mm   
+            ticks_travelled_avg = ((msg.ticks_left - self.startTickLeft) + (msg.ticks_right - self.startTickRight)) / 2.0
+            circumference = math.pi * 72.0  # in mm
+            dist_travelled = ticks_travelled_avg / 508.8 * circumference
             # Log wheel ticks
-            self.get_logger().info(f"Dist travelled is {ticks_travelled * dist_per_tick} mm. Ticks: {ticks_travelled}. Dist per tick: {dist_per_tick} mm")
+            self.get_logger().info(f"WHEELTICK distance {dist_travelled / 100.0} cm")
         elif self.state == 'IDLE':
             # Update start ticks to current ticks
             self.startTickLeft = msg.ticks_left
