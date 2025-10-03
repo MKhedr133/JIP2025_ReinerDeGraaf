@@ -33,7 +33,7 @@ def extract_cps_all(line: str) -> List[float]:
 class ScintillatorFilterNode(Node):
     def __init__(self):
         super().__init__("scintillator_filter")
-        self.declare_parameter("threshold", 20.0)
+        self.declare_parameter("threshold", 50.0)
         self.declare_parameter("cps_index", 1)
         self.threshold = float(self.get_parameter("threshold").value)
         self.cps_index = int(self.get_parameter("cps_index").value)
@@ -56,6 +56,7 @@ class ScintillatorFilterNode(Node):
         st = String(); st.data = "OK" if cps < self.threshold else "ALERT"
         self.pub_status.publish(st)
 
+        self.get_logger().info(f"CPS={cps:.2f}  Status={st.data}")
 
 def main():
     rclpy.init()
