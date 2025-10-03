@@ -1,8 +1,6 @@
 from setuptools import find_packages, setup
-import os
-from glob import glob
 
-package_name = 'simba_bringup'
+package_name = 'keyboard_listener'
 
 setup(
     name=package_name,
@@ -12,21 +10,17 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
     ],
-    install_requires=['setuptools'],
+    install_requires=['setuptools', 'rclpy', 'std_msgs', 'pynput'],
     zip_safe=True,
     maintainer='joost',
     maintainer_email='jevanbusschbach@gmail.com',
-    description='Launches everything needed for the simba robot',
-    license='TODO: License declaration',
-    extras_require={
-        'test': [
-            'pytest',
-        ],
-    },
+    description='Node that is responsible for listening to keyboard inputs',
+    license='MIT',
+    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'keyboard_listener = keyboard_listener.keyboard_listener:main'
         ],
     },
 )

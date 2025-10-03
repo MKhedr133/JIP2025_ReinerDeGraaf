@@ -7,7 +7,10 @@ Includes Nav2, SLAM, and drivers for sensors like the LB-124 scintillator.
 
 ```bash
 cd ros2_ws
-rosdep install --from-paths src -y --rosdistro humble
+rosdep install --from-paths src -y --rosdistro humble --skip-keys=ament_python
+
+#install pip dependencies
+
 colcon build --symlink-install
 source install/setup.bash
 ```

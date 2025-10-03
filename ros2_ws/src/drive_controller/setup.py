@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'other_sensors'
+package_name = 'drive_controller'
 
 setup(
     name=package_name,
@@ -13,14 +13,18 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='Mohamed Khedr',
-    maintainer_email='mkhedr@tudelft.nl',
+    maintainer='joost',
+    maintainer_email='jevanbusschbach@gmail.com',
     description='TODO: Package description',
-    license='Apache-2.0',
-    tests_require=['pytest'],
+    license='MIT',
+    extras_require={
+        'test': [
+            'pytest',
+        ],
+    },
     entry_points={
         'console_scripts': [
-            'sensor_bridge = other_sensors.sensor_bridge:main'
+            'drive_controller = drive_controller.drive_controller:main',
         ],
     },
 )
