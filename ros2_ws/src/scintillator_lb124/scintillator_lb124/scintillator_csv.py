@@ -17,7 +17,9 @@ from datetime import datetime
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32
+from irobot_create_msgs.msg import WheelTicks
 from ament_index_python.packages import get_package_share_directory
+import math
 
 
 class ScintillatorCsvNode(Node):
@@ -41,15 +43,36 @@ class ScintillatorCsvNode(Node):
         self.writer = csv.writer(self.fh)
 
         if add_header:
-            self.writer.writerow(["time", "cps"])
+            self.writer.writerow(["time", "cps", "distance_cm"])
             self.fh.flush()
 
+        # Initialize latest data
+        self.latest_cps = None
+        self.latest_left_ticks = None
+        self.latest_right_ticks = None
+        self.circumference = math.pi * 72.0  # in mm
+
         self.create_subscription(Float32, "/scintillator/cps", self.on_cps, 10)
+        self.create_subscription(WheelTicks, "/wheel_tick", self.on_wheel_tick, 10)
+
+        # Timer: log data x times per second
+        self.create_timer(1.0, self.log_data)
+
         self.get_logger().info(f"Logging CPS to {self.path}")
 
     def on_cps(self, msg: Float32):
+        self.latest_cps = msg.data
+
+    def on_wheel_tick(self, msg: WheelTicks):
+        self.latest_left_ticks = msg.left_ticks
+        self.latest_right_ticks = msg.right_ticks
+
+    def log_data(self):
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.writer.writerow([now, f"{msg.data:.6f}"])
+
+        cps = f"{self.latest_cps:.2f}" if self.latest_cps is not None else ""
+        distance_cm = ((((self.latest_left_ticks + self.latest_right_ticks) / 2.0) / 508.8) * self.circumference)/ 100.0 if self.latest_left_ticks is not None and self.latest_right_ticks is not None else ""
+        self.writer.writerow([now, cps, distance_cm])
         self.fh.flush()
 
     def destroy_node(self):
