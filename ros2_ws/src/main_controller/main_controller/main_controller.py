@@ -107,7 +107,7 @@ class MainControllerNode(Node):
             circumference = math.pi * 72.0  # in mm
             dist_travelled = ticks_travelled_avg / 508.8 * circumference
             # Log wheel ticks
-            self.get_logger().info(f"WHEELTICK distance {dist_travelled / 100.0} cm")
+            # self.get_logger().info(f"WHEELTICK distance {dist_travelled / 100.0} cm")
         elif self.state == 'IDLE':
             # Update start ticks to current ticks
             self.startTickLeft = msg.ticks_left

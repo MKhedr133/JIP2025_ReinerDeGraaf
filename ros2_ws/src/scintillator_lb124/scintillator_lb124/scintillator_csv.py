@@ -20,6 +20,7 @@ from std_msgs.msg import Float32, String
 from irobot_create_msgs.msg import WheelTicks
 from ament_index_python.packages import get_package_share_directory
 import math
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy
 
 
 class ScintillatorCsvNode(Node):
@@ -50,13 +51,21 @@ class ScintillatorCsvNode(Node):
         self.latest_cps = None
         self.latest_left_ticks = None
         self.latest_right_ticks = None
+        self.start_left_ticks = None
+        self.start_right_ticks = None
         self.circumference = math.pi * 72.0  # in mm
 
         # Control logging via this flag
         self.should_log = False
 
+        # make sure QOS lines up with roomba stuff
+        qos = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            depth=10
+        )
+
         self.create_subscription(Float32, "/scintillator/cps", self.on_cps, 10)
-        self.create_subscription(WheelTicks, "/wheel_tick", self.on_wheel_tick, 10)
+        self.create_subscription(WheelTicks, "wheel_ticks", self.on_wheel_tick, qos)
         self.create_subscription(String, "/simba_state", self.on_simba_state, 10)
 
 
@@ -70,6 +79,8 @@ class ScintillatorCsvNode(Node):
             if not self.should_log:
                 self.get_logger().info("Received 'EXPERIMENT' on /simba_state → Starting CSV logging")
             self.should_log = True
+            self.start_left_ticks = self.latest_left_ticks
+            self.start_right_ticks = self.latest_right_ticks
         else:
             if self.should_log:
                 self.get_logger().info(f"/simba_state changed to '{msg.data}' → Stopping CSV logging")
@@ -80,20 +91,27 @@ class ScintillatorCsvNode(Node):
         self.latest_cps = msg.data
 
     def on_wheel_tick(self, msg: WheelTicks):
-        self.latest_left_ticks = msg.left_ticks
-        self.latest_right_ticks = msg.right_ticks
+        self.latest_left_ticks = msg.ticks_left
+        self.latest_right_ticks = msg.ticks_right
 
     def log_data(self):
-
         if not self.should_log:
             return  
         
+
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         cps = f"{self.latest_cps:.2f}" if self.latest_cps is not None else ""
-        distance_cm = ((((self.latest_left_ticks + self.latest_right_ticks) / 2.0) / 508.8) * self.circumference)/ 100.0 if self.latest_left_ticks is not None and self.latest_right_ticks is not None else ""
+
+        if self.start_left_ticks is not None or self.start_right_ticks is not None:
+            delta_ticks = ((self.latest_left_ticks - self.start_left_ticks) + (self.latest_right_ticks - self.start_right_ticks)) / 2.0 
+            distance_cm = ((delta_ticks / 508.8) * self.circumference)/ 100.0 if self.latest_left_ticks is not None and self.latest_right_ticks is not None else ""
+        else:
+            distance_cm = None
         self.writer.writerow([now, cps, distance_cm])
         self.fh.flush()
+        # self.get_logger().info("Logged data row")
+        self.get_logger().info(f"Logged cps: {cps}, dist: {distance_cm} cm")
 
     def destroy_node(self):
         try:
