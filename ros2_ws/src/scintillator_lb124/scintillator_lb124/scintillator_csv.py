@@ -16,7 +16,7 @@ from datetime import datetime
 
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, String
 from irobot_create_msgs.msg import WheelTicks
 from ament_index_python.packages import get_package_share_directory
 import math
@@ -52,13 +52,29 @@ class ScintillatorCsvNode(Node):
         self.latest_right_ticks = None
         self.circumference = math.pi * 72.0  # in mm
 
+        # Control logging via this flag
+        self.should_log = False
+
         self.create_subscription(Float32, "/scintillator/cps", self.on_cps, 10)
         self.create_subscription(WheelTicks, "/wheel_tick", self.on_wheel_tick, 10)
+        self.create_subscription(String, "/simba_state", self.on_simba_state, 10)
+
 
         # Timer: log data x times per second
-        self.create_timer(1.0, self.log_data)
+        self.create_timer(0.1, self.log_data)
 
         self.get_logger().info(f"Logging CPS to {self.path}")
+
+    def on_simba_state(self, msg: String):
+        if msg.data.strip().upper() == "EXPERIMENT":
+            if not self.should_log:
+                self.get_logger().info("Received 'EXPERIMENT' on /simba_state → Starting CSV logging")
+            self.should_log = True
+        else:
+            if self.should_log:
+                self.get_logger().info(f"/simba_state changed to '{msg.data}' → Stopping CSV logging")
+            self.should_log = False
+
 
     def on_cps(self, msg: Float32):
         self.latest_cps = msg.data
@@ -68,6 +84,10 @@ class ScintillatorCsvNode(Node):
         self.latest_right_ticks = msg.right_ticks
 
     def log_data(self):
+
+        if not self.should_log:
+            return  
+        
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         cps = f"{self.latest_cps:.2f}" if self.latest_cps is not None else ""

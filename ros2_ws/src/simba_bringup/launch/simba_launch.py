@@ -1,5 +1,9 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import PathJoinSubstitution
+from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     return LaunchDescription([
@@ -23,35 +27,15 @@ def generate_launch_description():
             name='drive_controller',
             output='screen'
         ),
-        # # Launch scintillator nodes
-        # Node(
-        #     package='scintillator_lb124',
-        #     executable='scintillator_raw_node',
-        #     name='scintillator_raw',
-        #     parameters=[{
-        #         'port': '/dev/ttyUSB0',
-        #         'baud': 19200,
-        #         'timeout_s': 1.0,
-        #     }],
-        #     output='screen',
-        # ),
-        # Node(
-        #     package='scintillator_lb124',
-        #     executable='scintillator_filtered_node',
-        #     name='scintillator_filter',
-        #     parameters=[{
-        #         'threshold': 20.0,
-        #         'cps_index': 1,
-        #     }], output='screen',
-        # ), 
-        # Node(
-        #     package='scintillator_lb124',
-        #     executable='scintillator_csv_node',
-        #     name='scintillator_csv',
-        #     parameters=[{
-        #         'output_dir': '/home/user/scintillator_data',
-        #         'add_header': True,
-        #     }],
-        #     output='screen',
-        # ),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                PathJoinSubstitution([
+                    FindPackageShare('scintillator_lb124'),
+                    'launch',
+                    'scintillator.launch.py'
+                ])
+            )
+        ),
+
     ])
