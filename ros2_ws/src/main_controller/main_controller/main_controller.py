@@ -24,7 +24,7 @@ from rclpy.node import Node
 from std_msgs.msg import String
 from nav_msgs.msg import Odometry
 from irobot_create_msgs.msg import WheelTicks
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, String
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy
 import math
 
@@ -36,6 +36,12 @@ class MainControllerNode(Node):
         # Initial state
         self.state = 'IDLE'
         self.get_logger().info(f"Initial state: {self.state}")
+        self.statePublisher = self.create_publisher(
+            String,
+            'simba_state',
+            10
+        )
+
 
         # Keep track of Distance Travelled in EXPERIMENT state
         self.startpose = (0.0,0.0,0.0) # TODO: save this in a better data format
@@ -55,13 +61,6 @@ class MainControllerNode(Node):
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
             depth=10
         )
-
-        # Subscriber to /odom
-        self.odomSubscriber = self.create_subscription(
-            Odometry,
-            'odom',
-            self.odom_callback,
-            qos)
         
         # Subscriber to /wheel_ticks
         self.tickSubscriber = self.create_subscription(
@@ -78,15 +77,19 @@ class MainControllerNode(Node):
             10
         )
 
+
+
     def key_input_callback(self, msg: String):
         key = msg.data.strip()
         self.get_logger().info(f"Received key input: '{key}'")
 
         if key == 'y':
             self.state = 'EXPERIMENT'
+            self.statePublisher.publish(String(data=self.state))
             self.get_logger().info(f"State changed to: {self.state}. Starting experiment.")
         elif key == 'h':
             self.state = 'IDLE'
+            self.statePublisher.publish(String(data=self.state))
             self.get_logger().info(f"State changed to: {self.state}. Stopping experiment.")
         elif key == 'm':
             # Toggle manual control
@@ -98,26 +101,13 @@ class MainControllerNode(Node):
         else:
             self.get_logger().info(f"No state change (current state: {self.state})")
 
-    # PROBABLY DEPRECATED, Wheelticks more accurate!
-    def odom_callback(self, msg: Odometry):
-        if self.state == 'EXPERIMENT':
-            # Extract position from the Odometry message
-            position = msg.pose.pose.position
-            # Log how much distance we've travelled
-            distance_travelled = math.sqrt((msg.pose.pose.position.x - self.startpose[0]) ** 2 +
-                                  (msg.pose.pose.position.y - self.startpose[1]) ** 2) ** 0.5
-            # self.get_logger().info(f"ODOM distance: {distance_travelled:.2f} meters")
-        elif self.state == 'IDLE':
-            # Update startpose to current position
-            self.startpose = (msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z)
-        
     def tick_callback(self, msg: WheelTicks):
         if self.state == 'EXPERIMENT':
             ticks_travelled_avg = ((msg.ticks_left - self.startTickLeft) + (msg.ticks_right - self.startTickRight)) / 2.0
             circumference = math.pi * 72.0  # in mm
             dist_travelled = ticks_travelled_avg / 508.8 * circumference
             # Log wheel ticks
-            self.get_logger().info(f"WHEELTICK distance {dist_travelled / 100.0} cm")
+            # self.get_logger().info(f"WHEELTICK distance {dist_travelled / 100.0} cm")
         elif self.state == 'IDLE':
             # Update start ticks to current ticks
             self.startTickLeft = msg.ticks_left
