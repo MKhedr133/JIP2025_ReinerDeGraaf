@@ -70,7 +70,7 @@ class ScintillatorCsvNode(Node):
 
 
         # Timer: log data x times per second
-        self.create_timer(0.1, self.log_data)
+        self.create_timer(1.0, self.log_data)
 
         self.get_logger().info(f"Logging CPS to {self.path}")
 

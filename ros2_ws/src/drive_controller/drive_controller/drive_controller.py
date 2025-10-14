@@ -65,8 +65,10 @@ class DriveControlNode(Node):
                 self.rotate(-self.ang_speed)
             elif msg.data == 'r':
                 self.lin_speed += 0.01
+                self.get_logger().info(f"Linear speed increased to {self.lin_speed:.2f}")
             elif msg.data == 'f':
                 self.lin_speed = max(0.01, self.lin_speed - 0.01)
+                self.get_logger().info(f"Linear speed decreased to {self.lin_speed:.2f}")
             elif msg.data == 't':
                 self.ang_speed += 0.01
             elif msg.data == 'g':

@@ -56,7 +56,7 @@ class ScintillatorFilterNode(Node):
         st = String(); st.data = "OK" if cps < self.threshold else "ALERT"
         self.pub_status.publish(st)
 
-        self.get_logger().info(f"CPS={cps:.2f}  Status={st.data}")
+        # self.get_logger().info(f"CPS={cps:.2f}  Status={st.data}")
 
 def main():
     rclpy.init()

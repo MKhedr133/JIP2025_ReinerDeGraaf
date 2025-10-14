@@ -39,7 +39,7 @@ class KeyboardListenerNode(Node):
             except AttributeError:
                 key_str = str(key)  # Special keys (Key.esc, Key.space, etc.)
 
-            # self.get_logger().info(f"Key pressed: {key_str}")
+            self.get_logger().info(f"Key pressed: {key_str}")
             msg = String()
             msg.data = key_str
             self.publisher_.publish(msg)    #publish the key press
