@@ -36,5 +36,19 @@ Topic: '/key_input', msg = std_msgs.msg.String, contains key pressed on keyboard
 Defined in main-controller:
 Topic: '/manual_control_enabled', msg = std_msgs.msg.Bool, flag for enabling keyboard-listener readout
 
+## LIDAR + SLAM Setup (Current Working Stage)
+1. Run the full mapping stack:
+```bash
+ros2 launch create3_lidar_slam full_slam_setup.launch.py
+```
 
+2. Afterwards if hardware is mounted to the roomba, run teleop:
+```bash
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+``` 
 
+3. Drive around and watch the map update in RViz
+4. Save map for Nav2:
+```bash
+ros2 run nav2_map_server map_saver_cli -f src/maps
+```
