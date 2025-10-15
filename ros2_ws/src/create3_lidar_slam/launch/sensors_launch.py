@@ -37,19 +37,13 @@ def generate_launch_description():
 
     # Declares an action that will launch a node when executed by the launch description.
     # This node is responsible for configuring the RPLidar sensor.
-    lidar_node = Node(
-        package='sllidar_ros2',
-        executable='sllidar_node',
-        name='sllidar_node',
+    rplidar_node = Node(
+        package='rplidar_ros',
+        executable='rplidar_composition',
         output='screen',
-        parameters=[{
-            'channel_type': 'serial',
-            'serial_port': '/dev/ttyUSB0',
-            'serial_baudrate': 115200,          # A2M8 baudrate
-            'frame_id': 'laser_frame',
-            'inverted': False,
-            'angle_compensate': True,
-        }],
+        parameters=[
+            get_package_share_directory("create3_lidar_slam") + '/config/rplidar_node.yaml'
+            ],
         namespace=namespace
     )
 
@@ -59,6 +53,6 @@ def generate_launch_description():
         static_transform_node,
         TimerAction(
             period=2.0,
-            actions=[lidar_node]
+            actions=[rplidar_node]
         )
     ])
