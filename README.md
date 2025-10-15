@@ -50,5 +50,5 @@ ros2 run teleop_twist_keyboard teleop_twist_keyboard
 3. Drive around and watch the map update in RViz
 4. Save map for Nav2:
 ```bash
-ros2 run nav2_map_server map_saver_cli -f src/maps
+ros2 run nav2_map_server map_saver_cli -f src/maps/create3_map
 ```
