@@ -23,6 +23,12 @@ def generate_launch_description():
         )
     )
 
+    ekf_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution([pkg_dir, 'launch', 'ekf_launch.py'])
+        )
+    )
+
     # --- Include the SLAM Toolbox launch file ---
     slam_toolbox_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -40,6 +46,7 @@ def generate_launch_description():
     # --- Launch all three together ---
     return LaunchDescription([
         sensors_launch,
+        ekf_launch,
         slam_toolbox_launch,
         rviz_launch
     ])
