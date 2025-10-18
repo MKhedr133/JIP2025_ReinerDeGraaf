@@ -12,9 +12,10 @@ setup(
         # Core package indexes
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        # 👇 Install your launch and config directories
         (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
         (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
+        (os.path.join('share', package_name, 'config', 'maps'),
+        glob('config/maps/*.*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
