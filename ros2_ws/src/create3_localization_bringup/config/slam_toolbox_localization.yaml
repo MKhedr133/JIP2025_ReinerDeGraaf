@@ -2,7 +2,7 @@ slam_toolbox:
   ros__parameters:
     use_sim_time: false
     mode: "localization"
-    map_file_name: "/work/config/maps/create3_map.data"  # your saved map
+    map_file_name: "/work/ros2_ws/src/create3_localization_bringup/config/maps/create3_home_map.data"
     map_frame: "map"
     odom_frame: "odom"
     base_frame: "base_link"
