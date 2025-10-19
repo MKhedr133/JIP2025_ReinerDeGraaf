@@ -1,58 +1,75 @@
-#!/usr/bin/env python3
-# Copyright 2022 iRobot Corporation. All Rights Reserved.
-
 from launch import LaunchDescription
-from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument, TimerAction
 from launch.substitutions import LaunchConfiguration
-from ament_index_python.packages import get_package_share_directory
-
+from launch_ros.actions import Node
 
 def generate_launch_description():
-    # Evaluate at launch the value of the launch configuration 'namespace'
-    namespace = LaunchConfiguration('namespace')
+    # ---- Launch-time args (simple, editable) ----
+    serial_port_arg = DeclareLaunchArgument(
+        "serial_port", default_value="/dev/ttyUSB0",
+        description="RPLIDAR serial device"
+    )
+    serial_baud_arg = DeclareLaunchArgument(
+        "serial_baudrate", default_value="115200",
+        description="RPLIDAR serial baudrate"
+    )
+    frame_id_arg = DeclareLaunchArgument(
+        "laser_frame", default_value="laser_frame",
+        description="Frame id of the lidar"
+    )
+    # Offsets of lidar w.r.t. base_link (meters, radians)
+    x_arg = DeclareLaunchArgument("x", default_value="-0.012")
+    y_arg = DeclareLaunchArgument("y", default_value="0.0")
+    z_arg = DeclareLaunchArgument("z", default_value="0.144")
+    roll_arg = DeclareLaunchArgument("roll", default_value="0.0")
+    pitch_arg = DeclareLaunchArgument("pitch", default_value="0.0")
+    yaw_arg = DeclareLaunchArgument("yaw", default_value="0.0")
 
-    # Declares an action to allow users to pass the robot namespace from the
-    # CLI into the launch description as an argument.
-    namespace_argument = DeclareLaunchArgument(
-        'namespace',
-        default_value='',
-        description='Robot namespace')
+    serial_port = LaunchConfiguration("serial_port")
+    serial_baudrate = LaunchConfiguration("serial_baudrate")
+    laser_frame = LaunchConfiguration("laser_frame")
+    x = LaunchConfiguration("x")
+    y = LaunchConfiguration("y")
+    z = LaunchConfiguration("z")
+    rr = LaunchConfiguration("roll")
+    pp = LaunchConfiguration("pitch")
+    yy = LaunchConfiguration("yaw")
 
-    # Declares an action that will launch a node when executed by the launch description.
-    # This node is responsible for providing a static transform from the robot's base_footprint
-    # frame to a new laser_frame, which will be the coordinate frame for the lidar.
-    static_transform_node = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        arguments=['-0.012', '0', '0.144', '0', '0', '0', 'base_link', 'laser_frame'],
-
-        # Remaps topics used by the 'tf2_ros' package from absolute (with slash) to relative (no slash).
-        # This is necessary to use namespaces with 'tf2_ros'.
-        remappings=[
-            ('/tf_static', 'tf_static'),
-            ('/tf', 'tf')],
-        namespace=namespace
+    # ---- Static TF: base_link -> laser_frame ----
+    static_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="static_tf_base_to_laser",
+        arguments=[x, y, z, rr, pp, yy, "base_link", laser_frame],
+        output="screen",
     )
 
-    # Declares an action that will launch a node when executed by the launch description.
-    # This node is responsible for configuring the RPLidar sensor.
-    rplidar_node = Node(
-        package='rplidar_ros',
-        executable='rplidar_composition',
-        output='screen',
-        parameters=[
-            get_package_share_directory("create3_lidar_slam") + '/config/rplidar_node.yaml'
-            ],
-        namespace=namespace
+    # ---- RPLIDAR driver (composition) ----
+    # We keep config in YAML but override port/baud/frame via params for clarity.
+    rplidar = Node(
+        package="rplidar_ros",
+        executable="rplidar_composition",
+        name="rplidar_composition",
+        parameters=[{
+            "frame_id": laser_frame,
+            "channel_type": "serial",
+            "serial_port": serial_port,
+            "serial_baudrate": serial_baudrate,
+            "scan_mode": "",            # auto
+            "angle_compensate": True,
+            "auto_standby": True,
+            "topic_name": "scan",
+            "use_sim_time": False
+        }],
+        output="screen",
     )
 
-    # Launches all named actions
+    # Some drivers like a tiny delay after TF to avoid early TF lookup warnings
+    delayed_lidar = TimerAction(period=2.0, actions=[rplidar])
+
     return LaunchDescription([
-        namespace_argument,
-        static_transform_node,
-        TimerAction(
-            period=2.0,
-            actions=[rplidar_node]
-        )
+        serial_port_arg, serial_baud_arg, frame_id_arg,
+        x_arg, y_arg, z_arg, roll_arg, pitch_arg, yaw_arg,
+        static_tf,
+        delayed_lidar,
     ])
