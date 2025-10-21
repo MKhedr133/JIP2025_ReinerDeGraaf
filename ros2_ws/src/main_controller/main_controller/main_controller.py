@@ -102,12 +102,16 @@ class MainControllerNode(Node):
             self.statePublisher.publish(String(data=self.state))
             self.get_logger().info(f"State changed to: {self.state}. Stopping experiment.")
         elif key == 'm':
-            # Toggle manual control
-            self.manualControlEnabled = not (self.manualControlEnabled)
-            msg_flag = Bool()
-            msg_flag.data = self.manualControlEnabled
-            self.manualControlPublisher.publish(msg_flag)
-            self.get_logger().info(f"Manual control {'enabled' if self.manualControlEnabled else 'disabled'}. Current state: {self.state}")
+            # Toggle modes
+            if self.state == 'IDLE':
+                self.state = 'DRIVE'
+                self.statePublisher.publish(String(data=self.state))
+                self.get_logger().info(f"State changed to: {self.state}")
+            elif self.state == 'STOP':
+                self.state = 'IDLE'
+                self.statePublisher.publish(String(data=self.state))
+                self.get_logger().info(f"State changed to: {self.state}")
+
         else:
             self.get_logger().info(f"No state change (current state: {self.state})")
 
