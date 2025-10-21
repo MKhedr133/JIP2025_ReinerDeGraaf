@@ -11,7 +11,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
-    install_requires=['setuptools'],
+    install_requires=['setuptools', 'gpiozero'],
     zip_safe=True,
     maintainer='joost',
     maintainer_email='jevanbusschbach@gmail.com',
@@ -24,6 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'servo_node = servo_controller.servo_node:main',
         ],
     },
 )

@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64
-from gpiozero import Servo
+from gpiozero import AngularServo
 
 class ServoControllerNode(Node):
     def __init__(self):
@@ -11,11 +11,17 @@ class ServoControllerNode(Node):
         self.declare_parameter('gpio_pin', 18)
         self.gpio_pin = self.get_parameter('gpio_pin').value
 
-        # Initialize gpiozero Servo
+        # Initialize AngularServo with safe defaults for QY3225MG
         try:
-            self.servo = Servo(self.gpio_pin, min_pulse_width=0.0005, max_pulse_width=0.0025) # TODO: Adjust pulse widths as needed
+            self.servo = AngularServo(
+                self.gpio_pin,
+                min_angle=0,
+                max_angle=180,
+                min_pulse_width=0.0005,
+                max_pulse_width=0.0025
+            )
         except Exception as e:
-            self.get_logger().error(f"Failed to initialize Servo on GPIO {self.gpio_pin}: {e}")
+            self.get_logger().error(f"Failed to initialize AngularServo on GPIO {self.gpio_pin}: {e}")
             exit(1)
 
         self.subscriber = self.create_subscription(
@@ -24,16 +30,15 @@ class ServoControllerNode(Node):
             self.angle_callback,
             10
         )
-        self.get_logger().info(f"Servo controller initialized on GPIO {self.gpio_pin} using gpiozero.")
+        self.get_logger().info(f"AngularServo controller initialized on GPIO {self.gpio_pin}.")
 
     def angle_callback(self, msg):
         angle = msg.data
-        clamped_angle = max(0.0, min(180.0, angle))
-        servo_value = (clamped_angle - 90.0) / 90.0  # Map 0-180 → -1 to 1
+        clamped_angle = max(0.0, min(180.0, angle))  # Keep within safe range
 
         try:
-            self.servo.value = servo_value
-            self.get_logger().info(f"Set angle: {clamped_angle:.1f}°, gpiozero value: {servo_value:.2f}")
+            self.servo.angle = clamped_angle
+            self.get_logger().info(f"Set angle: {clamped_angle:.1f}°")
         except Exception as e:
             self.get_logger().error(f"Failed to set servo angle: {e}")
 
