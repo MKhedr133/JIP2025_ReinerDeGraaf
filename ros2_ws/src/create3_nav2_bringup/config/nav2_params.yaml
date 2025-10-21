@@ -17,8 +17,8 @@ controller_server:
     current_progress_checker: "progress_checker"
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
-      required_movement_radius: 0.5
-      movement_time_allowance: 10.0
+      required_movement_radius: 0.10
+      movement_time_allowance: 15.0
 
     controller_plugins: ["FollowPath"]
     FollowPath:
@@ -71,9 +71,10 @@ local_costmap:
   local_costmap:
     ros__parameters:
       use_sim_time: false
-      footprint: "[[0.485, 0.195], [0.485, -0.195], [-0.195, -0.195], [-0.195, 0.195]]"
+      
+     robot_radius: 0.40
+
       transform_tolerance: 0.50
-      footprint_padding: 0.03
       global_frame: odom
       robot_base_frame: base_link
       rolling_window: true
@@ -90,7 +91,7 @@ local_costmap:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: true
         obstacle_range: 2.5
-        raytrance_range: 3.0
+        raytrace_range: 3.0
         inf_is_valid: true
         observation_sources: scan
         footprint_clearing_enabled: true
@@ -164,8 +165,9 @@ global_costmap:
   global_costmap:
     ros__parameters:
       use_sim_time: false
-      footprint: "[[0.485, 0.195], [0.485, -0.195], [-0.195, -0.195], [-0.195, 0.195]]"
-      footprint_padding: 0.03
+
+      robot_radius: 0.40
+      
       transform_tolerance: 0.50
       global_frame: map
       robot_base_frame: base_link
@@ -187,7 +189,7 @@ global_costmap:
         enabled: true
         footprint_clearing_enabled: true
         obstacle_range: 2.5
-        raytrance_range: 3.0
+        raytrace_range: 3.0
         inf_is_valid: true
         observation_sources: scan
         scan:
