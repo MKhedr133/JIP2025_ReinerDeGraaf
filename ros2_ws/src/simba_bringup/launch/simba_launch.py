@@ -31,11 +31,20 @@ def generate_launch_description():
             name='main_controller',
             output='screen'
         ),
+        # Launch the drive controller node
         Node(
             package='drive_controller',
             executable='drive_controller',
             name='drive_controller',
             output='screen'
+        ),
+        # Launch the servo controller node
+        Node(
+            package='servo_controller',
+            executable='servo_node',
+            name='servo_controller',
+            output='screen',
+            parameters=[{'gpio_pin': 18}]  # Set GPIO pin for servo
         ),
 
         IncludeLaunchDescription(

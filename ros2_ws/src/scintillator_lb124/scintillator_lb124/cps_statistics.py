@@ -29,7 +29,8 @@ class StatisticsCPSNode(Node):
         self.index = 0
 
         # Timer to publish statistics periodically
-        self.timer = self.create_timer(1.0, self.publish_statistics)
+        self.timer = self.create_timer(0.5, self.publish_statistics)
+        
         
     def listener_callback(self, msg):
         if numpy.isnan(msg.data):   #prevent errors from NaN values

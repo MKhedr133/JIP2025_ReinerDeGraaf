@@ -13,6 +13,9 @@ test_results/
 *.world
 *.model
 
+# ignore gazebo sim files
+ros2_ws/src/create3_sim
+
 # Python
 __pycache__/
 *.py[cod]

@@ -13,6 +13,8 @@
   <!-- Runtime deps -->
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
+  <depend>numpy</depend>
+  
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
 

@@ -24,7 +24,7 @@ from rclpy.node import Node
 from std_msgs.msg import String
 from nav_msgs.msg import Odometry
 from irobot_create_msgs.msg import WheelTicks
-from std_msgs.msg import Bool, String
+from std_msgs.msg import Bool, String, Float64
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy
 import math
 
@@ -87,6 +87,14 @@ class MainControllerNode(Node):
         self.client = self.create_client(SetParameters, '/motion_control/set_parameters')
         self.turn_off_safety_limits()
 
+        # publisher to /servo_angle (temporary for testing)
+        self.servo_pub = self.create_publisher(
+            Float64,
+            'servo_angle',
+            10
+        )
+        self.servo_angle = 90.0  # Default servo angle
+
 
 
     def key_input_callback(self, msg: String):
@@ -108,6 +116,20 @@ class MainControllerNode(Node):
             msg_flag.data = self.manualControlEnabled
             self.manualControlPublisher.publish(msg_flag)
             self.get_logger().info(f"Manual control {'enabled' if self.manualControlEnabled else 'disabled'}. Current state: {self.state}")
+        elif key == 'u':
+            self.servo_angle += 5.0
+            # Test servo by publishing an angle
+            msg_angle = Float64()
+            msg_angle.data = self.servo_angle
+            self.servo_pub.publish(msg_angle)
+            self.get_logger().info(f"Published servo angle: {self.servo_angle}° for testing.")
+        elif key == 'j':
+            self.servo_angle -= 5.0
+            # Test servo by publishing an angle
+            msg_angle = Float64()
+            msg_angle.data = self.servo_angle
+            self.servo_pub.publish(msg_angle)
+            self.get_logger().info(f"Published servo angle: {self.servo_angle}° for testing.")
         else:
             self.get_logger().info(f"No state change (current state: {self.state})")
 
@@ -125,30 +147,17 @@ class MainControllerNode(Node):
 
     # source: https://github.com/tuftsceeo/Tufts_Create3_Examples/blob/main/Projects/Penalty_Shootout/penalty_kick.py#L169
     def turn_off_safety_limits(self):
-        '''
-        Override the safety control paramter in another node so that we can drive backwards.
-        '''
-        
-        '''
-        get the request we will send to the service server
-        '''
+        # Override the safety control paramter in another node so that we can drive backwards.
+        # get the request we will send to the service server
         request = SetParameters.Request()
-        
-        '''
-        edit that paramter message with the correct parameter name & value
-        '''
+        # edit that paramter message with the correct parameter name & value
         param = Parameter() 
         param.name = "safety_override"
         param.value.type = ParameterType.PARAMETER_STRING
         param.value.string_value = 'full'
-        '''
-        append the service request with the correct parameter message
-        '''
+        # append the service request with the correct parameter message
         request.parameters.append(param)
-        
-        '''
-        wait until the service server is available then send the request
-        '''
+        # wait until the service server is available then send the request
         self.client.wait_for_service()
         self.future = self.client.call_async(request)
         self.get_logger().info('Safety limits turned off')
