@@ -8,41 +8,43 @@ amcl:
     base_frame_id: base_link
     scan_topic: /scan
     tf_broadcast: true
-    transform_tolerance: 0.2
+    transform_tolerance: 0.3        # a bit more tolerant to timestamp jitter
 
-    # Particle filter settings
+    # Particle filter
     min_particles: 500
     max_particles: 2000
     resample_interval: 1
-    kld_err: 0.05          # lower = more particles for accuracy
-    kld_z: 0.99
+    pf_err: 0.05
+    pf_z: 0.99
 
-    # Sensor + motion model noise. Start with modest noise; increase if odom is too “certain”
-    alpha1: 0.15  # rot noise due to rot
-    alpha2: 0.15  # rot noise due to trans
-    alpha3: 0.10  # trans noise due to trans
-    alpha4: 0.10  # trans noise due to rot
-    alpha5: 0.10  # (only used with omni models, harmless here)
+    # Motion model noise (AMCL names are alpha1..alpha5)
+    alpha1: 0.15
+    alpha2: 0.15
+    alpha3: 0.10
+    alpha4: 0.10
+    alpha5: 0.10
 
-    # Laser limits
+    # Laser model (likelihood field)
     laser_model_type: likelihood_field
-    laser_min_range: 0.05
-    laser_max_range: 4.0
+    laser_min_range: -1.0           # use the scanner's reported min if unsure
+    laser_max_range: -1.0           # use the scanner's reported max if unsure
+    laser_sigma_hit: 0.20
     laser_z_hit: 0.95
     laser_z_rand: 0.05
     laser_z_max: 0.05
     laser_z_short: 0.01
-    laser_sigma_hit: 0.20
+    lambda_short: 0.1
     laser_likelihood_max_dist: 2.0
 
-    # Update thresholds (smaller -> more frequent updates)
+    # Beam skipping (robust to glass / outliers)
+    do_beamskip: true
+    beam_skip_distance: 0.5
+    beam_skip_threshold: 0.3
+    beam_skip_error_threshold: 0.9
+
+    # Update thresholds (controls update rate)
     update_min_d: 0.10
     update_min_a: 0.10
 
-    # Map settings
+    # Initial pose: set via RViz “2D Pose Estimate” or enable below
     set_initial_pose: false
-    always_reset_initial_pose: false
-    do_beamskip: true
-    beamskip_threshold: 0.3       # skip beams that disagree strongly (glass, narrow FOV issues)
-    beamskip_error_threshold: 0.9
-    beamskip_min_beams: 20
