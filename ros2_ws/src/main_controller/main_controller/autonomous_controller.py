@@ -14,12 +14,12 @@ class SearchMovementNode(Node):
         # --- Publishers / Subscribers ---
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         self.state_pub = self.create_publisher(String, '/simba_state', 10)
-        self.create_subscription(Float32, '/cps', self.cps_callback, 10)
-        self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
-        self.create_subscription(String, '/simba_state', self.state_callback, 10)
+        self.cps_sub = self.create_subscription(Float32, '/scintillator/cps', self.cps_callback, 10)
+        self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
+        self.state_sub = self.create_subscription(String, '/simba_state', self.state_callback, 10)
 
         # --- Parameters ---
-        self.forward_speed = 0.2
+        self.forward_speed = 0.1
         self.rotation_speed = 0.3  # rad/s
         self.sweep_range_deg = 20
         self.threshold_drive = 20.0
@@ -36,7 +36,7 @@ class SearchMovementNode(Node):
         self.sweep_direction = 1
         self.sweep_data = []
         self.best_yaw = 0.0
-        self.timer = self.create_timer(0.1, self.main_loop)
+        self.timer = self.create_timer(0.05, self.main_loop)
         self.motion_timer = None
 
         self.get_logger().info("SearchMovementNode started")
@@ -45,6 +45,7 @@ class SearchMovementNode(Node):
 
     def cps_callback(self, msg: Float32):
         self.current_cps = msg.data
+        self.get_logger().debug(f"Current CPS: {self.current_cps}")
 
     def odom_callback(self, msg: Odometry):
         """Extract yaw (heading) from /odom quaternion."""
@@ -107,6 +108,7 @@ class SearchMovementNode(Node):
 
         self.cmd_pub.publish(twist)
         self.sweep_data.append((yaw, self.current_cps))
+        self.get_logger().info(f"Sweeping: yaw={math.degrees(yaw):.1f}°, cps={self.current_cps:.2f}")
 
         if done:
             if self.sweep_direction == 1:
@@ -147,7 +149,17 @@ class SearchMovementNode(Node):
                 self.state_pub.publish(String(data="STOP"))
             else:
                 self.get_logger().info("Restarting sweep phase.")
+                # reset sweep variables
+                self.yaw_start = self.current_yaw
+                self.sweep_target_low = self.normalize_angle(self.yaw_start - math.radians(self.sweep_range_deg))
+                self.sweep_target_high = self.normalize_angle(self.yaw_start + math.radians(self.sweep_range_deg))
+                self.sweep_direction = 1  # start rotating positively
+                self.sweep_data = []
                 self.state_pub.publish(String(data="SWEEP"))
+
+
+
+
 
     def stop_state(self):
         self.stop_robot()
