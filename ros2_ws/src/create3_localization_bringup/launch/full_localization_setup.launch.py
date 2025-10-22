@@ -12,7 +12,7 @@ def generate_launch_description():
     localization_pkg = get_package_share_directory('create3_localization_bringup')
 
     # --- Config paths ---
-    map_yaml = os.path.join(localization_pkg, 'config', 'maps', 'create3_map.yaml')
+    map_yaml = os.path.join(localization_pkg, 'config', 'maps', 'create3_home_map.yaml')
     amcl_yaml = os.path.join(localization_pkg, 'config', 'amcl_params.yaml')
 
     # --- Launch: Sensors (LiDAR + static TF + EKF) ---
