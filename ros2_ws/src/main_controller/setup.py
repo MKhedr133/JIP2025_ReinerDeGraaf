@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'main_controller = main_controller.main_controller:main',
+            'autonomous_controller = main_controller.autonomous_controller:main',
         ],
     },
 )

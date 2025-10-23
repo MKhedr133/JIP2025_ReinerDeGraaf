@@ -64,4 +64,11 @@ def generate_launch_description():
         output='screen',
     )
 
-    return LaunchDescription([port, baud, threshold, output_dir, raw, filt, csv])
+    statistics = Node(
+        package='scintillator_lb124',
+        executable='cps_statistics',
+        name='cps_statistics',
+        output='screen',
+    )
+
+    return LaunchDescription([port, baud, threshold, output_dir, raw, filt, csv, statistics])

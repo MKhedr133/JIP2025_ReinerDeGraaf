@@ -7,6 +7,16 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     return LaunchDescription([
+        # Launch Create3 simulation in Gazebo (Classic)
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                PathJoinSubstitution([
+                    FindPackageShare('irobot_create_gazebo_bringup'),
+                    'launch',
+                    'create3_gazebo.launch.py'
+                ])
+            )
+        ),
         # Launch the keyboard listener node
         Node(
             package='keyboard_listener',
@@ -21,13 +31,21 @@ def generate_launch_description():
             name='main_controller',
             output='screen'
         ),
+        # Launch the drive controller node
         Node(
             package='drive_controller',
             executable='drive_controller',
             name='drive_controller',
             output='screen'
         ),
-
+        # Launch the autonomous controller node
+        Node(
+            package='main_controller',
+            executable='autonomous_controller',
+            name='autonomous_controller',
+            output='screen'
+        ),
+        # Launch the scintillator nodes
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 PathJoinSubstitution([

@@ -23,6 +23,7 @@ setup(
             'scintillator_raw_node = scintillator_lb124.scintillator_raw:main',
             'scintillator_filtered_node = scintillator_lb124.scintillator_filtered:main',
             'scintillator_csv_node = scintillator_lb124.scintillator_csv:main',
+            'cps_statistics = scintillator_lb124.cps_statistics:main',
         ],
     },
 )
