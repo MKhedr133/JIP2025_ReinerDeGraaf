@@ -25,14 +25,20 @@ class SearchMovementNode(Node):
         self.state_sub = self.create_subscription(String, '/simba_state', self.state_callback, 10)
 
         # --- Parameters ---
-        self.forward_speed = 0.1
-        self.rotation_speed = 0.1  # rad/s
-        self.sweep_range_deg = 60
-        self.sweep_increment_deg = 10.0
-        self.sweep_wait_duration = 3.0  # seconds
-        self.threshold_drive = 20.0
-        self.threshold_goal = 500.0
-        self.forward_duration = 0.5  # seconds
+        param_defaults = {
+            'forward_speed': 0.1,
+            'rotation_speed': 0.1,
+            'sweep_range_deg': 60.0,
+            'sweep_increment_deg': 10.0,
+            'sweep_wait_duration': 3.0,
+            'threshold_drive': 20.0,
+            'threshold_goal': 500.0,
+            'forward_duration': 0.5,
+        }
+
+        for param_name, default_value in param_defaults.items():
+            self.declare_parameter(param_name, default_value)
+            setattr(self, param_name, self.get_parameter(param_name).value)
 
         # --- State machine ---
         self.state = "IDLE"
