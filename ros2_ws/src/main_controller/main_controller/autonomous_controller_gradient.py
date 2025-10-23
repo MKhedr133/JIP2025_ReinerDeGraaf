@@ -131,7 +131,7 @@ class SearchMovementNode(Node):
             self.sweep_wait_end_time = self.get_clock().now() + rclpy.duration.Duration(seconds=self.sweep_wait_duration)
 
     def sweep_wait_state(self):
-        """Record data whilst waiting a moment"""
+        """Wait for a moment, then record data."""
         if self.get_clock().now() < self.sweep_wait_end_time:
             self.sweep_data.append((self.current_yaw, self.current_cps))
             self.get_logger().info(f"Recorded: yaw={math.degrees(self.current_yaw):.1f}°, cps={self.current_cps:.2f}")
@@ -147,16 +147,30 @@ class SearchMovementNode(Node):
             self.state_pub.publish(String(data="SWEEP_INCREMENT"))
 
     def sweep_evaluate_state(self):
-        """Find the best yaw from the sweep and transition to REALIGN."""
+        """Find the yaw with the highest gradient (steepest CPS increase) and transition to REALIGN."""
         self.stop_robot()
-        if not self.sweep_data:
-            self.get_logger().warning("No data from sweep, returning to DRIVE.")
+        if len(self.sweep_data) < 2:
+            self.get_logger().warning("Not enough data from sweep for gradient calculation, returning to DRIVE.")
             self.state_pub.publish(String(data="DRIVE"))
             return
 
-        best_yaw, best_cps = max(self.sweep_data, key=lambda x: x[1])
-        self.best_yaw = best_yaw
-        self.get_logger().info(f"Sweep done. Best yaw={math.degrees(best_yaw):.1f}°, cps={best_cps:.2f}")
+        # Pad the data to handle gradients at the edges.
+        # The first element is duplicated at the start, and the last at the end.
+        padded_data = [self.sweep_data[0]] + self.sweep_data + [self.sweep_data[-1]]
+
+        gradients = [
+            {'yaw': current[0], 'cps': current[1], 'gradient': next_p[1] - current[1]}
+            for current, next_p in zip(padded_data, padded_data[1:])
+        ]
+
+        if not gradients:
+            self.get_logger().warning("Could not calculate any gradients, returning to DRIVE.")
+            self.state_pub.publish(String(data="DRIVE"))
+            return
+
+        best_point = max(gradients, key=lambda x: x['gradient'])
+        self.best_yaw = best_point['yaw']
+        self.get_logger().info(f"Sweep done. Best gradient {best_point['gradient']:.2f} found at yaw={math.degrees(self.best_yaw):.1f}° (cps={best_point['cps']:.2f})")
         self.state_pub.publish(String(data="REALIGN"))
 
     def realign_state(self):
