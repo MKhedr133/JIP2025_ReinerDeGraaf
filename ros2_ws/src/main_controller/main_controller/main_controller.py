@@ -107,7 +107,8 @@ class MainControllerNode(Node):
                 self.state = 'DRIVE'
                 self.statePublisher.publish(String(data=self.state))
                 self.get_logger().info(f"State changed to: {self.state}")
-            elif self.state == 'STOP':
+            # elif self.state == 'STOP':
+            else:
                 self.state = 'IDLE'
                 self.statePublisher.publish(String(data=self.state))
                 self.get_logger().info(f"State changed to: {self.state}")

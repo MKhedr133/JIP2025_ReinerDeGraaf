@@ -5,34 +5,44 @@ from geometry_msgs.msg import Twist
 from std_msgs.msg import Float32, String
 from nav_msgs.msg import Odometry
 from tf_transformations import euler_from_quaternion
-
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy
 
 class SearchMovementNode(Node):
     def __init__(self):
         super().__init__('autonomous_controller')
 
+        # --- QOS for pubs/subs ---
+        # make sure QOS lines up with roomba stuff
+        qos = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            depth=10
+        )
         # --- Publishers / Subscribers ---
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         self.state_pub = self.create_publisher(String, '/simba_state', 10)
         self.cps_sub = self.create_subscription(Float32, '/scintillator/cps', self.cps_callback, 10)
-        self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
+        self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, qos)
         self.state_sub = self.create_subscription(String, '/simba_state', self.state_callback, 10)
 
         # --- Parameters ---
         self.forward_speed = 0.1
-        self.rotation_speed = 0.3  # rad/s
-        self.sweep_range_deg = 20
+        self.rotation_speed = 0.1  # rad/s
+        self.sweep_range_deg = 60
+        self.sweep_increment_deg = 10.0
+        self.sweep_wait_duration = 3.0  # seconds
         self.threshold_drive = 20.0
-        self.threshold_goal = 100.0
+        self.threshold_goal = 500.0
         self.forward_duration = 0.5  # seconds
 
         # --- State machine ---
         self.state = "IDLE"
+        self.target_yaw = 0.0
         self.current_cps = 0.0
         self.current_yaw = 0.0
         self.yaw_start = 0.0
         self.sweep_target_low = 0.0
         self.sweep_target_high = 0.0
+        self.sweep_wait_end_time = None
         self.sweep_direction = 1
         self.sweep_data = []
         self.best_yaw = 0.0
@@ -62,8 +72,16 @@ class SearchMovementNode(Node):
     def main_loop(self):
         if self.state == "DRIVE":
             self.drive_state()
-        elif self.state == "SWEEP":
-            self.sweep_state()
+        elif self.state == "SWEEP_START":
+            self.sweep_start_state()
+        elif self.state == "SWEEP_ALIGN_LOW":
+            self.sweep_align_low_state()
+        elif self.state == "SWEEP_INCREMENT":
+            self.sweep_increment_state()
+        elif self.state == "SWEEP_WAIT":
+            self.sweep_wait_state()
+        elif self.state == "SWEEP_EVALUATE":
+            self.sweep_evaluate_state()
         elif self.state == "REALIGN":
             self.realign_state()
         elif self.state == "FORWARD_SHORT":
@@ -82,55 +100,68 @@ class SearchMovementNode(Node):
         else:
             self.get_logger().info("Drive threshold reached → Sweep phase")
             self.stop_robot()
-            # initialize sweep range
-            self.yaw_start = self.current_yaw
-            self.sweep_target_low = self.normalize_angle(self.yaw_start - math.radians(self.sweep_range_deg))
-            self.sweep_target_high = self.normalize_angle(self.yaw_start + math.radians(self.sweep_range_deg))
-            self.sweep_direction = 1  # start rotating positively
-            self.sweep_data = []
-            self.state_pub.publish(String(data="SWEEP"))
+            self.state_pub.publish(String(data="SWEEP_START"))
 
-    def sweep_state(self):
-        """Rotate across ±range around start yaw, recording cps values."""
-        yaw = self.current_yaw
-        twist = Twist()
-        done = False
+    def sweep_start_state(self):
+        """Initialize sweep parameters and start alignment."""
+        self.get_logger().info("Initializing sweep.")
+        self.yaw_start = self.current_yaw
+        self.sweep_target_low = self.normalize_angle(self.yaw_start - math.radians(self.sweep_range_deg))
+        self.sweep_target_high = self.normalize_angle(self.yaw_start + math.radians(self.sweep_range_deg))
+        self.sweep_data = []
+        self.target_yaw = self.sweep_target_low
+        self.state_pub.publish(String(data="SWEEP_ALIGN_LOW"))
 
-        # Determine sweep direction
-        if self.sweep_direction == 1:  # sweeping positive direction
-            twist.angular.z = abs(self.rotation_speed)
-            if self.angle_reached(yaw, self.sweep_target_high, self.sweep_direction):
-                done = True
-        else:  # sweeping back negative
-            twist.angular.z = -abs(self.rotation_speed)
-            if self.angle_reached(yaw, self.sweep_target_low, self.sweep_direction):
-                done = True
+    def sweep_align_low_state(self):
+        """Rotate to the starting angle of the sweep."""
+        self.get_logger().info(f"Aligning to sweep start: {math.degrees(self.target_yaw):.1f}°")
+        if self.rotate_to_yaw(self.target_yaw):
+            self.stop_robot()
+            self.get_logger().info("Aligned. Starting incremental sweep.")
+            self.state_pub.publish(String(data="SWEEP_WAIT"))
+            self.sweep_wait_end_time = self.get_clock().now() + rclpy.duration.Duration(seconds=self.sweep_wait_duration)
 
-        self.cmd_pub.publish(twist)
-        self.sweep_data.append((yaw, self.current_cps))
-        self.get_logger().info(f"Sweeping: yaw={math.degrees(yaw):.1f}°, cps={self.current_cps:.2f}")
+    def sweep_increment_state(self):
+        """Rotate by one increment."""
+        self.get_logger().info(f"Sweeping to next increment: {math.degrees(self.target_yaw):.1f}°")
+        if self.rotate_to_yaw(self.target_yaw):
+            self.stop_robot()
+            self.get_logger().info("Increment reached. Waiting to record data.")
+            self.state_pub.publish(String(data="SWEEP_WAIT"))
+            self.sweep_wait_end_time = self.get_clock().now() + rclpy.duration.Duration(seconds=self.sweep_wait_duration)
 
-        if done:
-            if self.sweep_direction == 1:
-                # reverse direction for backward sweep
-                self.sweep_direction = -1
-                self.get_logger().info("Reached +range, sweeping back...")
-            else:
-                # full sweep done
-                self.stop_robot()
-                best_yaw, best_cps = max(self.sweep_data, key=lambda x: x[1])
-                self.best_yaw = best_yaw
-                self.get_logger().info(f"Sweep done. Best yaw={math.degrees(best_yaw):.1f}°, cps={best_cps:.2f}")
-                self.state_pub.publish(String(data="REALIGN"))
+    def sweep_wait_state(self):
+        """Wait for a moment, then record data."""
+        if self.get_clock().now() < self.sweep_wait_end_time:
+            self.sweep_data.append((self.current_yaw, self.current_cps))
+            self.get_logger().info(f"Recorded: yaw={math.degrees(self.current_yaw):.1f}°, cps={self.current_cps:.2f}")
+            return
+
+        # Check if sweep is complete
+        if self.angle_diff(self.sweep_target_high, self.current_yaw) < math.radians(1.0):
+            self.get_logger().info("Sweep range covered.")
+            self.state_pub.publish(String(data="SWEEP_EVALUATE"))
+        else: # Prepare for next increment
+            next_yaw = self.current_yaw + math.radians(self.sweep_increment_deg)
+            self.target_yaw = self.normalize_angle(next_yaw)
+            self.state_pub.publish(String(data="SWEEP_INCREMENT"))
+
+    def sweep_evaluate_state(self):
+        """Find the best yaw from the sweep and transition to REALIGN."""
+        self.stop_robot()
+        if not self.sweep_data:
+            self.get_logger().warning("No data from sweep, returning to DRIVE.")
+            self.state_pub.publish(String(data="DRIVE"))
+            return
+
+        best_yaw, best_cps = max(self.sweep_data, key=lambda x: x[1])
+        self.best_yaw = best_yaw
+        self.get_logger().info(f"Sweep done. Best yaw={math.degrees(best_yaw):.1f}°, cps={best_cps:.2f}")
+        self.state_pub.publish(String(data="REALIGN"))
 
     def realign_state(self):
         """Rotate robot to best yaw using odometry feedback."""
-        yaw_error = self.angle_diff(self.best_yaw, self.current_yaw)
-        if abs(yaw_error) > math.radians(2):
-            twist = Twist()
-            twist.angular.z = math.copysign(self.rotation_speed, yaw_error)
-            self.cmd_pub.publish(twist)
-        else:
+        if self.rotate_to_yaw(self.best_yaw):
             self.stop_robot()
             self.get_logger().info("Realigned to best yaw → moving forward shortly.")
             self.state_pub.publish(String(data="FORWARD_SHORT"))
@@ -149,16 +180,10 @@ class SearchMovementNode(Node):
                 self.state_pub.publish(String(data="STOP"))
             else:
                 self.get_logger().info("Restarting sweep phase.")
-                # reset sweep variables
-                self.yaw_start = self.current_yaw
-                self.sweep_target_low = self.normalize_angle(self.yaw_start - math.radians(self.sweep_range_deg))
-                self.sweep_target_high = self.normalize_angle(self.yaw_start + math.radians(self.sweep_range_deg))
-                self.sweep_direction = 1  # start rotating positively
-                self.sweep_data = []
-                self.state_pub.publish(String(data="SWEEP"))
+                self.state_pub.publish(String(data="SWEEP_START"))
 
 
-
+    
 
 
     def stop_state(self):
@@ -180,11 +205,18 @@ class SearchMovementNode(Node):
         diff = target - current
         return math.atan2(math.sin(diff), math.cos(diff))
 
-    def angle_reached(self, current, target, direction):
-        """Check if we've passed target angle given rotation direction."""
-        diff = self.angle_diff(target, current)
-        # if direction positive: stop when diff < 0, if negative: stop when diff > 0
-        return (direction == 1 and diff < 0) or (direction == -1 and diff > 0)
+    def rotate_to_yaw(self, target_yaw, tolerance_rad=math.radians(2.0)):
+        """Rotates robot towards a target yaw. Returns True when aligned."""
+        yaw_error = self.angle_diff(target_yaw, self.current_yaw)
+        if abs(yaw_error) > tolerance_rad:
+            twist = Twist()
+            # Use a slightly faster rotation for alignment
+            twist.angular.z = math.copysign(self.rotation_speed * 5, yaw_error)
+            self.cmd_pub.publish(twist)
+            return False
+        else:
+            self.stop_robot()
+            return True
 
 
 def main(args=None):
