@@ -6,13 +6,6 @@ test_results/
 *.test
 *.xunit.xml
 
-# RViz / maps / sim artifacts (keep if you don't want these tracked)
-*.rviz
-*.pgm
-*.yaml
-*.world
-*.model
-
 # Python
 __pycache__/
 *.py[cod]

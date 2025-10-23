@@ -16,5 +16,9 @@ find_package(ament_cmake REQUIRED)
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
 install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
 install(DIRECTORY rviz DESTINATION share/${PROJECT_NAME})
-
+install(PROGRAMS
+  scripts/save_map_and_graph.sh
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME save_map_and_graph
+)
 ament_package()

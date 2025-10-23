@@ -36,19 +36,47 @@ Topic: '/key_input', msg = std_msgs.msg.String, contains key pressed on keyboard
 Defined in main-controller:
 Topic: '/manual_control_enabled', msg = std_msgs.msg.Bool, flag for enabling keyboard-listener readout
 
-## LIDAR + SLAM Setup (Current Working Stage)
-1. Run the full mapping stack:
+## LIDAR + EKF + SLAM Setup (Current Working Stage)
+1. Build & source
+```bash
+colcon build
+source install/setup.bash
+```
+2. Start sensors (RPLIDAR + static TF)
+```bash
+ros2 launch create3_lidar_slam sensors_launch.py \
+  serial_port:=/dev/ttyUSB0 serial_baudrate:=115200 \
+  laser_frame:=laser_frame x:=-0.012 y:=0.0 z:=0.144
+```bash
+### Checks
+```bash
+ros2 topic echo --once /scan --qos-reliability best_effort --qos-durability volatile
+```
+3. Start EKF (odom + IMU → /odometry/filtered)
+Fuses /odom and /imu and publishes odom → base_link and /odometry/filtered. 
+```bash
+ros2 launch create3_lidar_slam ekf_launch.py
+```
+### Checks
+```bash
+ros2 topic hz /odometry/filtered            # ~30–50 Hz
+ros2 run tf2_tools view_frames              # writes frames.pdf (no GUI in minimal containers)
+```
+4. Run SLAM mapping (SLAM Toolbox, mapping mode)
+Use the all-in-one mapping launch (sensors + EKF + SLAM + RViz).
 ```bash
 ros2 launch create3_lidar_slam full_slam_setup.launch.py
 ```
-
-2. Afterwards if hardware is mounted to the roomba, run teleop:
+If the hardware is on the robot, drive with keyboard:
 ```bash
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
-``` 
+```
+### What you should see in RViz
+- LaserScan on /scan
+- Growing occupancy Map on /map
+- Stable TF: map → odom → base_link → laser_frame
 
-3. Drive around and watch the map update in RViz
-4. Save map for Nav2:
+5. Save the map (for Nav2) and the pose-graph
 ```bash
-ros2 run nav2_map_server map_saver_cli -f src/maps/create3_map
+scripts/save_map_and_graph.sh # create3_lidar_slam
 ```

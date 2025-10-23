@@ -1,10 +1,11 @@
-from setuptools import find_packages, setup
+from setuptools import setup
+from setuptools import find_packages
 
-package_name = 'simba_slam'
+package_name = 'create3_examples_py'
 
 setup(
     name=package_name,
-    version='0.0.0',
+    version='0.0.5',
     packages=find_packages(exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages',
@@ -13,14 +14,14 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='Mohamed Khedr',
-    maintainer_email='mkhedr@tudelft.nl',
-    description='TODO: Package description',
-    license='Apache-2.0',
+    maintainer='jkearns',
+    maintainer_email='jkearns@irobot.com',
+    description='Example ROS 2 Python code to use iRobot® Create® 3',
+    license='BSD-3',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'slam_helper = simba_slam.slam_helper:main'
+            'create3_dance = create3_examples_py.dance.create3_dance:main'
         ],
     },
 )

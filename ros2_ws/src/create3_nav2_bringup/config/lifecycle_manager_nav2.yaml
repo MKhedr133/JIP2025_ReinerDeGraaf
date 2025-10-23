@@ -1,0 +1,9 @@
+/**:
+  ros__parameters:
+      use_sim_time: false
+      autostart: true
+      node_names:
+        - planner_server
+        - controller_server
+        - behavior_server
+        - bt_navigator
