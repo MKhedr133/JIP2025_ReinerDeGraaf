@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>state_machine</name>
+  <version>0.0.0</version>
+  <description>Mission state machine: Nav2 patrol → CPS trigger → autonomous radiation behavior</description>
+  <maintainer email="mkhedr@tudelft.nl">root</maintainer>
+  <license>MIT</license>
+  
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav2_msgs</exec_depend>
+  <exec_depend>builtin_interfaces</exec_depend>
+  <exec_depend>nav2_util</exec_depend>
+
+  <!-- Optional: for map-aware waypoint generation from .pgm -->
+  <exec_depend>python3-pil</exec_depend> <!-- Pillow -->
+
+  <!-- Launch & params -->
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <!-- We reuse these existing packages in your workspace -->
+  <exec_depend>create3_localization_bringup</exec_depend>
+  <exec_depend>create3_nav2_bringup</exec_depend>
+  <exec_depend>create3_lidar_slam</exec_depend>
+  <exec_depend>main_controller</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
