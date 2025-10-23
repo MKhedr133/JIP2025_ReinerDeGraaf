@@ -196,3 +196,9 @@ global_costmap:
 
       # Use radius only
       robot_radius: 0.17
+
+waypoint_follower:
+  ros__parameters:
+    loop_rate: 10
+    stop_on_failure: false
+    default_behavior_tree: "navigate_to_pose_w_replanning_and_recovery.xml"

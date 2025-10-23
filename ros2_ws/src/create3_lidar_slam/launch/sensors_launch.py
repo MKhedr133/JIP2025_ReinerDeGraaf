@@ -6,7 +6,7 @@ from launch_ros.actions import Node
 def generate_launch_description():
     # ---- Launch-time args (simple, editable) ----
     serial_port_arg = DeclareLaunchArgument(
-        "serial_port", default_value="/dev/ttyUSB0",
+        "serial_port", default_value="/dev/rplidar",
         description="RPLIDAR serial device"
     )
     serial_baud_arg = DeclareLaunchArgument(

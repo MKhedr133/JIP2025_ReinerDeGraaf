@@ -11,6 +11,7 @@ from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import PathJoinSubstitution
 from ament_index_python.packages import get_package_share_directory
+from launch_ros.actions import Node
 
 def generate_launch_description():
     # --- Get path to this package ---
@@ -43,10 +44,26 @@ def generate_launch_description():
         )
     )
 
+    keyboard_listener = Node(
+        package='keyboard_listener',
+        executable='keyboard_listener',
+        name='keyboard_listener',
+        output='screen'
+    )
+
+    drive_controller = Node(
+        package='drive_controller',
+        executable='drive_controller',
+        name='drive_controller',
+        output='screen'
+    )
+
     # --- Launch all three together ---
     return LaunchDescription([
         sensors_launch,
         ekf_launch,
         slam_toolbox_launch,
-        rviz_launch
+        rviz_launch,
+        keyboard_listener,
+        drive_controller
     ])

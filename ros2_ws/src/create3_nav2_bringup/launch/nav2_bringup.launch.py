@@ -37,6 +37,13 @@ def generate_launch_description():
             parameters=[params],
         ),
         Node(
+            package='nav2_waypoint_follower',
+            executable='waypoint_follower',
+            name='waypoint_follower',
+            output='screen',
+            parameters=[params]
+        ),
+        Node(
             package='nav2_lifecycle_manager',
             executable='lifecycle_manager',
             name='lifecycle_manager_navigation',
@@ -48,6 +55,7 @@ def generate_launch_description():
                     'planner_server',
                     'controller_server',
                     'behavior_server',
+                    'waypoint_follower',
                     'bt_navigator',
                 ],
             }],
