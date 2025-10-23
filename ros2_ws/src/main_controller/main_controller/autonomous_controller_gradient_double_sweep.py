@@ -43,9 +43,10 @@ class SearchMovementNode(Node):
         self.sweep_target_low = 0.0
         self.sweep_target_high = 0.0
         self.sweep_wait_end_time = None
-        self.sweep_direction = 1
         self.sweep_data = []
         self.best_yaw = 0.0
+        self.sweep_pass = 1  # 1 for first pass (low->high), 2 for second pass (high->low)
+        self.best_yaw_pass1 = None
         self.timer = self.create_timer(0.05, self.main_loop)
         self.motion_timer = None
 
@@ -74,8 +75,8 @@ class SearchMovementNode(Node):
             self.drive_state()
         elif self.state == "SWEEP_START":
             self.sweep_start_state()
-        elif self.state == "SWEEP_ALIGN_LOW":
-            self.sweep_align_low_state()
+        elif self.state == "SWEEP_ALIGN":
+            self.sweep_align_state()
         elif self.state == "SWEEP_INCREMENT":
             self.sweep_increment_state()
         elif self.state == "SWEEP_WAIT":
@@ -104,17 +105,23 @@ class SearchMovementNode(Node):
 
     def sweep_start_state(self):
         """Initialize sweep parameters and start alignment."""
-        self.get_logger().info("Initializing sweep.")
-        self.yaw_start = self.current_yaw
-        self.sweep_target_low = self.normalize_angle(self.yaw_start - math.radians(self.sweep_range_deg))
-        self.sweep_target_high = self.normalize_angle(self.yaw_start + math.radians(self.sweep_range_deg))
-        self.sweep_data = []
-        self.target_yaw = self.sweep_target_low
-        self.state_pub.publish(String(data="SWEEP_ALIGN_LOW"))
+        if self.sweep_pass == 1:
+            self.get_logger().info("Initializing sweep pass 1 (low to high).")
+            self.yaw_start = self.current_yaw
+            self.sweep_target_low = self.normalize_angle(self.yaw_start - math.radians(self.sweep_range_deg / 2.0))
+            self.sweep_target_high = self.normalize_angle(self.yaw_start + math.radians(self.sweep_range_deg / 2.0))
+            self.target_yaw = self.sweep_target_low
+        else: # sweep_pass == 2
+            self.get_logger().info("Initializing sweep pass 2 (high to low).")
+            # Targets are already set from pass 1
+            self.target_yaw = self.sweep_target_high
 
-    def sweep_align_low_state(self):
-        """Rotate to the starting angle of the sweep."""
-        self.get_logger().info(f"Aligning to sweep start: {math.degrees(self.target_yaw):.1f}°")
+        self.sweep_data = []
+        self.state_pub.publish(String(data="SWEEP_ALIGN"))
+
+    def sweep_align_state(self):
+        """Rotate to the starting angle for the current sweep pass."""
+        self.get_logger().info(f"Aligning to sweep start angle: {math.degrees(self.target_yaw):.1f}°")
         if self.rotate_to_yaw(self.target_yaw):
             self.stop_robot()
             self.get_logger().info("Aligned. Starting incremental sweep.")
@@ -137,27 +144,70 @@ class SearchMovementNode(Node):
             self.get_logger().info(f"Recorded: yaw={math.degrees(self.current_yaw):.1f}°, cps={self.current_cps:.2f}")
             return
 
-        # Check if sweep is complete
-        if self.angle_diff(self.sweep_target_high, self.current_yaw) < math.radians(1.0):
-            self.get_logger().info("Sweep range covered.")
-            self.state_pub.publish(String(data="SWEEP_EVALUATE"))
-        else: # Prepare for next increment
-            next_yaw = self.current_yaw + math.radians(self.sweep_increment_deg)
-            self.target_yaw = self.normalize_angle(next_yaw)
-            self.state_pub.publish(String(data="SWEEP_INCREMENT"))
+        # Check for sweep completion and prepare for next increment
+        if self.sweep_pass == 1:
+            # Sweeping from low to high
+            if self.angle_diff(self.sweep_target_high, self.current_yaw) < math.radians(2.0):
+                self.get_logger().info("Sweep pass 1 finished.")
+                self.state_pub.publish(String(data="SWEEP_EVALUATE"))
+            else:
+                next_yaw = self.current_yaw + math.radians(self.sweep_increment_deg)
+                self.target_yaw = self.normalize_angle(next_yaw)
+                self.state_pub.publish(String(data="SWEEP_INCREMENT"))
+        else: # sweep_pass == 2
+            # Sweeping from high to low
+            if self.angle_diff(self.sweep_target_low, self.current_yaw) < math.radians(2.0):
+                self.get_logger().info("Sweep pass 2 finished.")
+                self.state_pub.publish(String(data="SWEEP_EVALUATE"))
+            else:
+                next_yaw = self.current_yaw - math.radians(self.sweep_increment_deg)
+                self.target_yaw = self.normalize_angle(next_yaw)
+                self.state_pub.publish(String(data="SWEEP_INCREMENT"))
 
     def sweep_evaluate_state(self):
-        """Find the best yaw from the sweep and transition to REALIGN."""
+        """Find the best yaw from the sweep. For pass 2, average and transition to REALIGN."""
         self.stop_robot()
         if not self.sweep_data:
-            self.get_logger().warning("No data from sweep, returning to DRIVE.")
+            self.get_logger().warning(f"No data from sweep pass {self.sweep_pass}, returning to DRIVE.")
+            self.sweep_pass = 1 # Reset
             self.state_pub.publish(String(data="DRIVE"))
             return
 
-        best_yaw, best_cps = max(self.sweep_data, key=lambda x: x[1])
-        self.best_yaw = best_yaw
-        self.get_logger().info(f"Sweep done. Best yaw={math.degrees(best_yaw):.1f}°, cps={best_cps:.2f}")
-        self.state_pub.publish(String(data="REALIGN"))
+        # calculate best yaw from current pass by calculating gradient
+        # Pad the data to handle gradients at the edges.
+        # The first element is duplicated at the start, and the last at the end.
+        padded_data = [self.sweep_data[0]] + self.sweep_data + [self.sweep_data[-1]]
+
+        gradients = [
+            {'yaw': current[0], 'cps': current[1], 'gradient': next_p[1] - current[1]}
+            for current, next_p in zip(padded_data, padded_data[1:])
+        ]
+
+        if not gradients:
+            self.get_logger().warning("Could not calculate any gradients, returning to DRIVE.")
+            self.state_pub.publish(String(data="DRIVE"))
+            return
+        
+        best_point = max(gradients, key=lambda x: x['gradient'])
+        best_yaw_current_pass = best_point['yaw']
+        best_cps = best_point['cps']
+        # best_yaw_current_pass, best_cps = max(self.sweep_data, key=lambda x: x[1])
+
+        if self.sweep_pass == 1:
+            self.best_yaw_pass1 = best_yaw_current_pass
+            self.get_logger().info(f"Sweep pass 1 done. Best yaw={math.degrees(self.best_yaw_pass1):.1f}°, cps={best_cps:.2f}")
+            # Start pass 2
+            self.sweep_pass = 2
+            self.state_pub.publish(String(data="SWEEP_START"))
+        else: # sweep_pass == 2
+            best_yaw_pass2 = best_yaw_current_pass
+            self.get_logger().info(f"Sweep pass 2 done. Best yaw={math.degrees(best_yaw_pass2):.1f}°, cps={best_cps:.2f}")
+
+            # Average the best yaws from both passes
+            self.best_yaw = self.normalize_angle((self.best_yaw_pass1 + best_yaw_pass2) / 2.0)
+            self.get_logger().info(f"Final averaged best yaw: {math.degrees(self.best_yaw):.1f}°")
+            self.sweep_pass = 1 # Reset for next time
+            self.state_pub.publish(String(data="REALIGN"))
 
     def realign_state(self):
         """Rotate robot to best yaw using odometry feedback."""
@@ -181,10 +231,6 @@ class SearchMovementNode(Node):
             else:
                 self.get_logger().info("Restarting sweep phase.")
                 self.state_pub.publish(String(data="SWEEP_START"))
-
-
-    
-
 
     def stop_state(self):
         self.stop_robot()
