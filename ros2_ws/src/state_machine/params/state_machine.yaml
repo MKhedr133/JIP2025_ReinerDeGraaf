@@ -1,32 +1,52 @@
+# Human-friendly config for the mission manager.
+# - Where to get waypoints from (generated/yaml/list)
+# - How to navigate them (sequential/batch)
+# - When to hand over to the radiation controller (CPS trigger)
+# - Startup waits & timeouts so we don't race AMCL/Map/Nav2
+
 state_machine:
   ros__parameters:
-    # CPS
+    # === Trigger to switch from Nav2 patrol -> radiation behavior ===
     cps_topic: "/scintillator/cps"
     cps_trigger: 20.0
+
+    # === Frames / goals ===
     frame_id: "map"
 
-    # After autonomous_controller publishes STOP, resume patrol?
-    resume_patrol_after_sweep: true
-
-    # Nav mode: 'sequential' (NavigateToPose) or 'batch' (NavigateThroughPoses)
-    nav_mode: "sequential"
-
-    # Where do waypoints come from?
-    #   'generated' → sweep from map YAML/PGM
-    #   'yaml'      → load a YAML list of {x,y,theta_deg}
-    #   'list'      → use inline list below
+    # === Patrol source ===
+    # 'generated' : auto-generate from the installed map YAML (boustrophedon)
+    # 'yaml'      : load a YAML file containing a LIST of waypoints
+    # 'list'      : use inline waypoints below
     route_source: "generated"
 
-    # If route_source == generated:
-    map_yaml: "/work/config/maps/create3_home_map.yaml"
-    lane_spacing_m: 1.0
-    heading_deg: 0.0
+    # Used when route_source == generated
+    # NOTE: mission_autonomy.launch.py overrides this with the installed map path,
+    # so you don't need to touch it for normal use.
+    map_yaml: "/dev/null"
+    lane_spacing_m: 1.0         # distance between sweep rows
+    heading_deg: 0.0            # default heading for waypoints
 
-    # If route_source == yaml:
-    # map_yaml: "/work/config/routes/route1.yaml"   # file with a YAML LIST of waypoints
+    # Used when route_source == yaml
+    # map_yaml: "/path/to/waypoints_list.yaml"   # this YAML must be a LIST of {x,y,theta_deg}
 
-    # If route_source == list (inline):
+    # Used when route_source == list
     waypoints:
       - {x: 1.0, y: 0.0, theta_deg: 0.0}
       - {x: 1.0, y: 1.0, theta_deg: 90.0}
       - {x: 0.0, y: 1.0, theta_deg: 180.0}
+
+    # === Nav mode ===
+    # 'sequential' : send goals one-by-one using /navigate_to_pose
+    # 'batch'      : send all poses at once using /navigate_through_poses
+    nav_mode: "sequential"
+
+    # === After radiation sweep finishes (the controller publishes 'STOP') ===
+    resume_patrol_after_sweep: true
+
+    # === Startup waits & timeouts ===
+    # We wait for:
+    #  - /map (latched OccupancyGrid from map_server)
+    #  - Nav2 action servers (navigate_to_pose / navigate_through_poses)
+    wait_for_map: true
+    wait_for_map_timeout_sec: 30.0
+    wait_for_nav2_timeout_sec: 60.0

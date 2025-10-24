@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'mission_manager = state_machine.mission_manager:main',
+            'initial_pose_publisher = state_machine.initial_pose_publisher:main',
         ],
     },
 )

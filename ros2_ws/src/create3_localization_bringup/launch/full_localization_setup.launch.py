@@ -5,7 +5,6 @@ from launch_ros.actions import Node
 import os
 from ament_index_python.packages import get_package_share_directory
 
-
 def generate_launch_description():
     # --- Package paths ---
     lidar_pkg = get_package_share_directory('create3_lidar_slam')
@@ -73,6 +72,22 @@ def generate_launch_description():
         output='screen'
     )
 
+    # --- Automatically publish the initial 2d pose esitmate ---
+    init_pose = Node(
+        package='state_machine',
+        executable='initial_pose_publisher',
+        name='initial_pose_publisher',
+        output='screen',
+        parameters=[{
+            # set sensible defaults for your map; can be overridden via launch args if needed
+            'initial_pose_x': 0.0,
+            'initial_pose_y': 0.0,
+            'initial_yaw_deg': 0.0,
+            'frame_id': 'map',
+            'wait_for_map_timeout_sec': 30.0,
+        }]
+    )
+
     # --- Return full launch description ---
     return LaunchDescription([
         sensors_launch,
@@ -80,5 +95,6 @@ def generate_launch_description():
         map_server,
         amcl,
         delayed_lifecycle,
-        rviz_node
+        rviz_node,
+        init_pose
     ])
