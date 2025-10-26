@@ -22,12 +22,15 @@ def generate_launch_description():
         ),
 
         # Launch the keyboard listener node
-        Node(
-            package='keyboard_listener',
-            executable='keyboard_listener',
-            name='keyboard_listener',
-            output='screen'
-        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                PathJoinSubstitution([
+                    FindPackageShare('keyboard_listener'),
+                    'launch',
+                    'keyboard_listener.launch.py'
+                ])
+            )
+        ),   
         # Launch the main controller node
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
