@@ -42,12 +42,15 @@ def generate_launch_description():
             )
         ),    
         # Launch the drive controller node
-        Node(
-            package='drive_controller',
-            executable='drive_controller',
-            name='drive_controller',
-            output='screen'
-        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                PathJoinSubstitution([
+                    FindPackageShare('drive_controller'),
+                    'launch',
+                    'drive_controller.launch.py'
+                ])
+            )
+        ),   
         # Launch the scintillator nodes
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
