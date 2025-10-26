@@ -170,7 +170,7 @@ class SearchMovementNode(Node):
 
         gradients = [
             {'yaw': current[0], 'cps': current[1], 'gradient': next_p[1] - current[1]}
-            for current, next_p in zip(padded_data, padded_data[1:])
+            for current, next_p in zip(padded_data[:-1], padded_data[1:])
         ]
 
         if not gradients:
