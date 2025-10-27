@@ -175,7 +175,7 @@ class SearchMovementNode(Node):
         # The 'best_yaw' is the direction of the source. To point its back towards it,
         # the robot's front should face 180 degrees away from the source.
         target_yaw_for_back_to_source = self.normalize_angle(self.best_yaw + math.pi)
-        if self.rotate_to_yaw(target_yaw_for_back_to_source):
+        if self.rotate_to_yaw(self.best_yaw):
             # Dynamically calculate forward duration
             # The closer we are to the goal, the shorter the duration.
             # The farther away, the longer the duration.
