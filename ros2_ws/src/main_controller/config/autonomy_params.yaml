@@ -1,0 +1,16 @@
+/**:
+  ros__parameters:
+    # Motion parameters
+    forward_speed: 0.1
+    rotation_speed: 0.1  # rad/s
+    min_forawrd_duration : 0.5
+    max_forward_duration : 5.0
+
+    # Sweep behavior parameters
+    sweep_range_deg: 60.0
+    sweep_increment_deg: 10.0
+    sweep_wait_duration: 3.0  # seconds
+
+    # Threshold parameters
+    threshold_drive: 20.0
+    threshold_goal: 500.0
