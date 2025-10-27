@@ -73,20 +73,20 @@ def generate_launch_description():
     )
 
     # --- Automatically publish the initial 2d pose esitmate ---
-    init_pose = Node(
-        package='state_machine',
-        executable='initial_pose_publisher',
-        name='initial_pose_publisher',
-        output='screen',
-        parameters=[{
+   # init_pose = Node(
+   #     package='state_machine',
+   #     executable='initial_pose_publisher',
+   #     name='initial_pose_publisher',
+   #     output='screen',
+   #    parameters=[{
             # set sensible defaults for your map; can be overridden via launch args if needed
-            'initial_pose_x': 0.0,
-            'initial_pose_y': 0.0,
-            'initial_yaw_deg': 0.0,
-            'frame_id': 'map',
-            'wait_for_map_timeout_sec': 30.0,
-        }]
-    )
+   #         'initial_pose_x': 0.0,
+   #         'initial_pose_y': 0.0,
+   #         'initial_yaw_deg': 0.0,
+   #         'frame_id': 'map',
+   #         'wait_for_map_timeout_sec': 30.0,
+   #    }]
+   # )
 
     # --- Return full launch description ---
     return LaunchDescription([
@@ -95,6 +95,6 @@ def generate_launch_description():
         map_server,
         amcl,
         delayed_lifecycle,
-        rviz_node,
-        init_pose
+        rviz_node
+#        init_pose
     ])

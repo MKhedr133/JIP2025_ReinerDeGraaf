@@ -25,7 +25,7 @@ def generate_launch_description():
         get_package_share_directory('scintillator_lb124'), 'csv'
     )
 
-    port = DeclareLaunchArgument('port', default_value=TextSubstitution(text='/dev/ttyUSB0'))
+    port = DeclareLaunchArgument('port', default_value=TextSubstitution(text='/dev/ttyUSB1'))
     baud = DeclareLaunchArgument('baud', default_value=TextSubstitution(text='19200'))
     threshold = DeclareLaunchArgument('threshold', default_value=TextSubstitution(text='20.0'))
     output_dir = DeclareLaunchArgument('output_dir', default_value=TextSubstitution(text=default_output_dir))
