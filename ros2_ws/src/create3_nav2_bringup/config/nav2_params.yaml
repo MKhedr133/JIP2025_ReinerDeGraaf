@@ -102,8 +102,8 @@ local_costmap:
         cost_scaling_factor: 3.0
         inflation_radius: 0.3
 
-      # Use radius only
-      robot_radius: 0.17
+      footprint: [[0.485, 0.195], [0.485, -0.195], [-0.195, -0.195], [-0.195, 0.195]]
+      footprint_padding: 0.03
 
 bt_navigator:
   ros__parameters:
@@ -194,8 +194,8 @@ global_costmap:
         cost_scaling_factor: 3.0
         inflation_radius: 0.55
 
-      # Use radius only
-      robot_radius: 0.17
+      footprint: [[0.485, 0.195], [0.485, -0.195], [-0.195, -0.195], [-0.195, 0.195]]
+      footprint_padding: 0.03
 
 waypoint_follower:
   ros__parameters:
