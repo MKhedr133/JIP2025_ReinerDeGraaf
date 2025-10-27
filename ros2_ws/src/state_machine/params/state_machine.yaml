@@ -50,3 +50,4 @@ state_machine:
     wait_for_map: true
     wait_for_map_timeout_sec: 30.0
     wait_for_nav2_timeout_sec: 60.0
+    sweep_timeout_sec: 600.0
