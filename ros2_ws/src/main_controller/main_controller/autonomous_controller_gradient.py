@@ -25,14 +25,22 @@ class SearchMovementNode(Node):
         self.state_sub = self.create_subscription(String, '/simba_state', self.state_callback, 10)
 
         # --- Parameters ---
-        self.forward_speed = 0.1
-        self.rotation_speed = 0.1  # rad/s
-        self.sweep_range_deg = 60
-        self.sweep_increment_deg = 10.0
-        self.sweep_wait_duration = 3.0  # seconds
-        self.threshold_drive = 20.0
-        self.threshold_goal = 500.0
-        self.forward_duration = 0.5  # seconds
+        param_defaults = {
+            'forward_speed': 0.1,
+            'rotation_speed': 0.1,
+            'sweep_range_deg': 60.0,
+            'sweep_increment_deg': 10.0,
+            'sweep_wait_duration': 3.0,
+            'threshold_drive': 20.0,
+            'threshold_goal': 500.0,
+            'forward_duration': 0.5,
+            'min_forward_duration': 0.5,
+            'max_forward_duration': 5.0,
+        }
+
+        for param_name, default_value in param_defaults.items():
+            self.declare_parameter(param_name, default_value)
+            setattr(self, param_name, self.get_parameter(param_name).value)
 
         # --- State machine ---
         self.state = "IDLE"
@@ -46,6 +54,8 @@ class SearchMovementNode(Node):
         self.sweep_direction = 1
         self.sweep_data = []
         self.best_yaw = 0.0
+        self.best_cps = 0.0
+        self.forward_end_time = None
         self.timer = self.create_timer(0.05, self.main_loop)
         self.motion_timer = None
 
@@ -160,7 +170,7 @@ class SearchMovementNode(Node):
 
         gradients = [
             {'yaw': current[0], 'cps': current[1], 'gradient': next_p[1] - current[1]}
-            for current, next_p in zip(padded_data, padded_data[1:])
+            for current, next_p in zip(padded_data[:-1], padded_data[1:])
         ]
 
         if not gradients:
@@ -170,16 +180,24 @@ class SearchMovementNode(Node):
 
         best_point = max(gradients, key=lambda x: x['gradient'])
         self.best_yaw = best_point['yaw']
-        self.get_logger().info(f"Sweep done. Best gradient {best_point['gradient']:.2f} found at yaw={math.degrees(self.best_yaw):.1f}° (cps={best_point['cps']:.2f})")
+        self.best_cps = best_point['cps']
+        self.get_logger().info(f"Sweep done. Best gradient {best_point['gradient']:.2f} found at yaw={math.degrees(self.best_yaw):.1f}° (cps={self.best_cps:.2f})")
         self.state_pub.publish(String(data="REALIGN"))
 
     def realign_state(self):
         """Rotate robot to best yaw using odometry feedback."""
         if self.rotate_to_yaw(self.best_yaw):
+            # Dynamically calculate forward duration
+            cps_diff = self.threshold_goal - self.best_cps
+            # We use max(0, cps_diff) to avoid negative durations if we overshoot the goal.
+            normalized_diff = max(0.0, cps_diff) / self.threshold_goal
+            # Linearly scale between min_forward_duration and max_forward_duration.
+            dynamic_duration = self.min_forward_duration + (self.max_forward_duration - self.min_forward_duration) * normalized_diff
+
             self.stop_robot()
             self.get_logger().info("Realigned to best yaw → moving forward shortly.")
             self.state_pub.publish(String(data="FORWARD_SHORT"))
-            self.forward_end_time = self.get_clock().now() + rclpy.duration.Duration(seconds=self.forward_duration)
+            self.forward_end_time = self.get_clock().now() + rclpy.duration.Duration(seconds=dynamic_duration)
 
     def forward_short_state(self):
         """Move forward a bit toward chosen direction."""

@@ -25,14 +25,23 @@ class SearchMovementNode(Node):
         self.state_sub = self.create_subscription(String, '/simba_state', self.state_callback, 10)
 
         # --- Parameters ---
-        self.forward_speed = 0.1
-        self.rotation_speed = 0.1  # rad/s
-        self.sweep_range_deg = 60
-        self.sweep_increment_deg = 10.0
-        self.sweep_wait_duration = 3.0  # seconds
-        self.threshold_drive = 20.0
-        self.threshold_goal = 500.0
-        self.forward_duration = 0.5  # seconds
+        param_defaults = {
+            'forward_speed': 0.1,
+            'rotation_speed': 0.1,
+            'sweep_rotation_speed': 0.05, # Slower speed for continuous sweep
+            'sweep_range_deg': 60.0,
+            'sweep_increment_deg': 10.0,
+            'sweep_wait_duration': 3.0,
+            'threshold_drive': 20.0,
+            'threshold_goal': 500.0,
+            'forward_duration': 0.5,
+            'min_forward_duration': 0.5,
+            'max_forward_duration': 5.0,
+        }
+
+        for param_name, default_value in param_defaults.items():
+            self.declare_parameter(param_name, default_value)
+            setattr(self, param_name, self.get_parameter(param_name).value)
 
         # --- State machine ---
         self.state = "IDLE"
@@ -42,15 +51,19 @@ class SearchMovementNode(Node):
         self.yaw_start = 0.0
         self.sweep_target_low = 0.0
         self.sweep_target_high = 0.0
-        self.sweep_wait_end_time = None
-        self.sweep_data = []
         self.best_yaw = 0.0
-        self.sweep_pass = 1  # 1 for first pass (low->high), 2 for second pass (high->low)
+        self.best_cps = 0.0
+        self.forward_end_time = None
+        
+        # Continuous sweep variables
         self.best_yaw_pass1 = None
-        self.timer = self.create_timer(0.05, self.main_loop)
-        self.motion_timer = None
+        self.best_cps_pass1 = -1.0
+        self.best_yaw_pass2 = None
+        self.best_cps_pass2 = -1.0
 
-        self.get_logger().info("SearchMovementNode started")
+        self.timer = self.create_timer(0.05, self.main_loop)
+
+        self.get_logger().info("Double Sweep started")
 
     # ---------------------- Callbacks ----------------------
 
@@ -77,10 +90,10 @@ class SearchMovementNode(Node):
             self.sweep_start_state()
         elif self.state == "SWEEP_ALIGN":
             self.sweep_align_state()
-        elif self.state == "SWEEP_INCREMENT":
-            self.sweep_increment_state()
-        elif self.state == "SWEEP_WAIT":
-            self.sweep_wait_state()
+        elif self.state == "SWEEPING_PASS_1":
+            self.sweeping_pass_1_state()
+        elif self.state == "SWEEPING_PASS_2":
+            self.sweeping_pass_2_state()
         elif self.state == "SWEEP_EVALUATE":
             self.sweep_evaluate_state()
         elif self.state == "REALIGN":
@@ -105,99 +118,103 @@ class SearchMovementNode(Node):
 
     def sweep_start_state(self):
         """Initialize sweep parameters and start alignment."""
-        if self.sweep_pass == 1:
-            self.get_logger().info("Initializing sweep pass 1 (low to high).")
-            self.yaw_start = self.current_yaw
-            self.sweep_target_low = self.normalize_angle(self.yaw_start - math.radians(self.sweep_range_deg / 2.0))
-            self.sweep_target_high = self.normalize_angle(self.yaw_start + math.radians(self.sweep_range_deg / 2.0))
-            self.target_yaw = self.sweep_target_low
-        else: # sweep_pass == 2
-            self.get_logger().info("Initializing sweep pass 2 (high to low).")
-            # Targets are already set from pass 1
-            self.target_yaw = self.sweep_target_high
+        self.get_logger().info("Initializing sweep.")
+        self.yaw_start = self.current_yaw
+        self.sweep_target_low = self.normalize_angle(self.yaw_start - math.radians(self.sweep_range_deg / 2.0))
+        self.sweep_target_high = self.normalize_angle(self.yaw_start + math.radians(self.sweep_range_deg / 2.0))
+        
+        # Reset sweep data
+        self.best_cps_pass1 = -1.0
+        self.best_yaw_pass1 = None
+        self.best_cps_pass2 = -1.0
+        self.best_yaw_pass2 = None
 
-        self.sweep_data = []
+        # Transition to alignment state
+        self.get_logger().info(f"Aligning to sweep start: {math.degrees(self.sweep_target_low):.1f}°")
         self.state_pub.publish(String(data="SWEEP_ALIGN"))
 
     def sweep_align_state(self):
-        """Rotate to the starting angle for the current sweep pass."""
-        self.get_logger().info(f"Aligning to sweep start angle: {math.degrees(self.target_yaw):.1f}°")
-        if self.rotate_to_yaw(self.target_yaw):
+        """Rotate to the starting angle for the sweep."""
+        if self.rotate_to_yaw(self.sweep_target_low):
             self.stop_robot()
-            self.get_logger().info("Aligned. Starting incremental sweep.")
-            self.state_pub.publish(String(data="SWEEP_WAIT"))
-            self.sweep_wait_end_time = self.get_clock().now() + rclpy.duration.Duration(seconds=self.sweep_wait_duration)
+            self.get_logger().info("Aligned. Starting sweep pass 1.")
+            self.state_pub.publish(String(data="SWEEPING_PASS_1"))
 
-    def sweep_increment_state(self):
-        """Rotate by one increment."""
-        self.get_logger().info(f"Sweeping to next increment: {math.degrees(self.target_yaw):.1f}°")
-        if self.rotate_to_yaw(self.target_yaw):
+    def sweeping_pass_1_state(self):
+        """Continuously rotate from low to high, recording the best CPS."""
+        # Check if we have reached the target
+        if abs(self.angle_diff(self.sweep_target_high, self.current_yaw)) < math.radians(2.0):
             self.stop_robot()
-            self.get_logger().info("Increment reached. Waiting to record data.")
-            self.state_pub.publish(String(data="SWEEP_WAIT"))
-            self.sweep_wait_end_time = self.get_clock().now() + rclpy.duration.Duration(seconds=self.sweep_wait_duration)
-
-    def sweep_wait_state(self):
-        """Record data whilst waiting a moment"""
-        if self.get_clock().now() < self.sweep_wait_end_time:
-            self.sweep_data.append((self.current_yaw, self.current_cps))
-            self.get_logger().info(f"Recorded: yaw={math.degrees(self.current_yaw):.1f}°, cps={self.current_cps:.2f}")
+            self.get_logger().info("Sweep pass 1 finished. Starting pass 2.")
+            self.state_pub.publish(String(data="SWEEPING_PASS_2"))
             return
 
-        # Check for sweep completion and prepare for next increment
-        if self.sweep_pass == 1:
-            # Sweeping from low to high
-            if self.angle_diff(self.sweep_target_high, self.current_yaw) < math.radians(2.0):
-                self.get_logger().info("Sweep pass 1 finished.")
-                self.state_pub.publish(String(data="SWEEP_EVALUATE"))
-            else:
-                next_yaw = self.current_yaw + math.radians(self.sweep_increment_deg)
-                self.target_yaw = self.normalize_angle(next_yaw)
-                self.state_pub.publish(String(data="SWEEP_INCREMENT"))
-        else: # sweep_pass == 2
-            # Sweeping from high to low
-            if self.angle_diff(self.sweep_target_low, self.current_yaw) < math.radians(2.0):
-                self.get_logger().info("Sweep pass 2 finished.")
-                self.state_pub.publish(String(data="SWEEP_EVALUATE"))
-            else:
-                next_yaw = self.current_yaw - math.radians(self.sweep_increment_deg)
-                self.target_yaw = self.normalize_angle(next_yaw)
-                self.state_pub.publish(String(data="SWEEP_INCREMENT"))
+        # Record best CPS reading during the sweep
+        if self.current_cps > self.best_cps_pass1:
+            self.best_cps_pass1 = self.current_cps
+            self.best_yaw_pass1 = self.current_yaw
+
+        # Rotate slowly
+        twist = Twist()
+        twist.angular.z = self.sweep_rotation_speed
+        self.cmd_pub.publish(twist)
+
+    def sweeping_pass_2_state(self):
+        """Continuously rotate from high to low, recording the best CPS."""
+        # Check if we have reached the target
+        if abs(self.angle_diff(self.sweep_target_low, self.current_yaw)) < math.radians(2.0):
+            self.stop_robot()
+            self.get_logger().info("Sweep pass 2 finished. Evaluating.")
+            self.state_pub.publish(String(data="SWEEP_EVALUATE"))
+            return
+
+        # Record best CPS reading during the sweep
+        if self.current_cps > self.best_cps_pass2:
+            self.best_cps_pass2 = self.current_cps
+            self.best_yaw_pass2 = self.current_yaw
+
+        # Rotate slowly in the opposite direction
+        twist = Twist()
+        twist.angular.z = -self.sweep_rotation_speed
+        self.cmd_pub.publish(twist)
 
     def sweep_evaluate_state(self):
         """Find the best yaw from the sweep. For pass 2, average and transition to REALIGN."""
         self.stop_robot()
-        if not self.sweep_data:
-            self.get_logger().warning(f"No data from sweep pass {self.sweep_pass}, returning to DRIVE.")
-            self.sweep_pass = 1 # Reset
+        if self.best_yaw_pass1 is None or self.best_yaw_pass2 is None:
+            self.get_logger().warning("Sweep did not yield valid data, returning to DRIVE.")
             self.state_pub.publish(String(data="DRIVE"))
             return
 
-        best_yaw_current_pass, best_cps = max(self.sweep_data, key=lambda x: x[1])
+        self.get_logger().info(f"Pass 1 best: yaw={math.degrees(self.best_yaw_pass1):.1f}°, cps={self.best_cps_pass1:.2f}")
+        self.get_logger().info(f"Pass 2 best: yaw={math.degrees(self.best_yaw_pass2):.1f}°, cps={self.best_cps_pass2:.2f}")
 
-        if self.sweep_pass == 1:
-            self.best_yaw_pass1 = best_yaw_current_pass
-            self.get_logger().info(f"Sweep pass 1 done. Best yaw={math.degrees(self.best_yaw_pass1):.1f}°, cps={best_cps:.2f}")
-            # Start pass 2
-            self.sweep_pass = 2
-            self.state_pub.publish(String(data="SWEEP_START"))
-        else: # sweep_pass == 2
-            best_yaw_pass2 = best_yaw_current_pass
-            self.get_logger().info(f"Sweep pass 2 done. Best yaw={math.degrees(best_yaw_pass2):.1f}°, cps={best_cps:.2f}")
+        # Average the best yaws from both passes
+        # Handle wrap-around for averaging angles
+        avg_x = math.cos(self.best_yaw_pass1) + math.cos(self.best_yaw_pass2)
+        avg_y = math.sin(self.best_yaw_pass1) + math.sin(self.best_yaw_pass2)
+        self.best_yaw = math.atan2(avg_y, avg_x)
 
-            # Average the best yaws from both passes
-            self.best_yaw = self.normalize_angle((self.best_yaw_pass1 + best_yaw_pass2) / 2.0)
-            self.get_logger().info(f"Final averaged best yaw: {math.degrees(self.best_yaw):.1f}°")
-            self.sweep_pass = 1 # Reset for next time
-            self.state_pub.publish(String(data="REALIGN"))
+        # Use the higher of the two peak CPS values for the forward duration calculation
+        self.best_cps = max(self.best_cps_pass1, self.best_cps_pass2)
+
+        self.get_logger().info(f"Final averaged best yaw: {math.degrees(self.best_yaw):.1f}°")
+        self.state_pub.publish(String(data="REALIGN"))
 
     def realign_state(self):
         """Rotate robot to best yaw using odometry feedback."""
         if self.rotate_to_yaw(self.best_yaw):
+            # Dynamically calculate forward duration
+            cps_diff = self.threshold_goal - self.best_cps
+            # We use max(0, cps_diff) to avoid negative durations if we overshoot the goal.
+            normalized_diff = max(0.0, cps_diff) / self.threshold_goal
+            # Linearly scale between min_forward_duration and max_forward_duration.
+            dynamic_duration = self.min_forward_duration + (self.max_forward_duration - self.min_forward_duration) * normalized_diff
+
             self.stop_robot()
             self.get_logger().info("Realigned to best yaw → moving forward shortly.")
             self.state_pub.publish(String(data="FORWARD_SHORT"))
-            self.forward_end_time = self.get_clock().now() + rclpy.duration.Duration(seconds=self.forward_duration)
+            self.forward_end_time = self.get_clock().now() + rclpy.duration.Duration(seconds=dynamic_duration)
 
     def forward_short_state(self):
         """Move forward a bit toward chosen direction."""

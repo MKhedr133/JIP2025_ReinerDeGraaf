@@ -70,7 +70,7 @@ class ScintillatorCsvNode(Node):
 
 
         # Timer: log data x times per second
-        self.create_timer(1.0, self.log_data)
+        self.create_timer(0.1, self.log_data)
 
         self.get_logger().info(f"Logging CPS to {self.path}")
 
@@ -99,7 +99,7 @@ class ScintillatorCsvNode(Node):
             return  
         
 
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
 
         cps = f"{self.latest_cps:.2f}" if self.latest_cps is not None else ""
 
@@ -108,10 +108,10 @@ class ScintillatorCsvNode(Node):
             distance_cm = ((delta_ticks / 508.8) * self.circumference)/ 100.0 if self.latest_left_ticks is not None and self.latest_right_ticks is not None else ""
         else:
             distance_cm = None
-        self.writer.writerow([now, cps, distance_cm])
+        self.writer.writerow([now, cps])
         self.fh.flush()
         # self.get_logger().info("Logged data row")
-        self.get_logger().info(f"Logged cps: {cps}, dist: {distance_cm} cm")
+        self.get_logger().info(f"Logged cps: {cps}")
 
     def destroy_node(self):
         try:
