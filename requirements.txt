@@ -1,2 +1,3 @@
-# scintillator_lb124
-pyserial>=3.5
+pyserial
+gpiozero
+pynput
