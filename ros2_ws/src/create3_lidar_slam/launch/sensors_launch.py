@@ -18,9 +18,9 @@ def generate_launch_description():
         description="Frame id of the lidar"
     )
     # Offsets of lidar w.r.t. base_link (meters, radians)
-    x_arg = DeclareLaunchArgument("x", default_value="-0.012")
-    y_arg = DeclareLaunchArgument("y", default_value="0.0")
-    z_arg = DeclareLaunchArgument("z", default_value="0.144")
+    x_arg = DeclareLaunchArgument("x", default_value="0.000")
+    y_arg = DeclareLaunchArgument("y", default_value="0.000")
+    z_arg = DeclareLaunchArgument("z", default_value="0.310")
     roll_arg = DeclareLaunchArgument("roll", default_value="0.0")
     pitch_arg = DeclareLaunchArgument("pitch", default_value="0.0")
     yaw_arg = DeclareLaunchArgument("yaw", default_value="0.0")
