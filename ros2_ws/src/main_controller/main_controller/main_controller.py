@@ -29,6 +29,12 @@ from rclpy.qos import QoSProfile, QoSReliabilityPolicy
 import math
 
 
+from rcl_interfaces.srv import SetParameters
+from rcl_interfaces.msg import ParameterType
+from rcl_interfaces.msg import ParameterValue 
+from rcl_interfaces.msg import Parameter
+
+
 class MainControllerNode(Node):
     def __init__(self):
         super().__init__('main_controller')
@@ -77,6 +83,10 @@ class MainControllerNode(Node):
             10
         )
 
+        # Turn off safety limits
+        self.client = self.create_client(SetParameters, '/motion_control/set_parameters')
+        self.turn_off_safety_limits()
+
 
 
     def key_input_callback(self, msg: String):
@@ -92,12 +102,17 @@ class MainControllerNode(Node):
             self.statePublisher.publish(String(data=self.state))
             self.get_logger().info(f"State changed to: {self.state}. Stopping experiment.")
         elif key == 'm':
-            # Toggle manual control
-            self.manualControlEnabled = not (self.manualControlEnabled)
-            msg_flag = Bool()
-            msg_flag.data = self.manualControlEnabled
-            self.manualControlPublisher.publish(msg_flag)
-            self.get_logger().info(f"Manual control {'enabled' if self.manualControlEnabled else 'disabled'}. Current state: {self.state}")
+            # Toggle modes
+            if self.state == 'IDLE':
+                self.state = 'DRIVE'
+                self.statePublisher.publish(String(data=self.state))
+                self.get_logger().info(f"State changed to: {self.state}")
+            # elif self.state == 'STOP':
+            else:
+                self.state = 'IDLE'
+                self.statePublisher.publish(String(data=self.state))
+                self.get_logger().info(f"State changed to: {self.state}")
+
         else:
             self.get_logger().info(f"No state change (current state: {self.state})")
 
@@ -112,6 +127,36 @@ class MainControllerNode(Node):
             # Update start ticks to current ticks
             self.startTickLeft = msg.ticks_left
             self.startTickRight = msg.ticks_right
+
+    # source: https://github.com/tuftsceeo/Tufts_Create3_Examples/blob/main/Projects/Penalty_Shootout/penalty_kick.py#L169
+    def turn_off_safety_limits(self):
+        '''
+        Override the safety control paramter in another node so that we can drive backwards.
+        '''
+        
+        '''
+        get the request we will send to the service server
+        '''
+        request = SetParameters.Request()
+        
+        '''
+        edit that paramter message with the correct parameter name & value
+        '''
+        param = Parameter() 
+        param.name = "safety_override"
+        param.value.type = ParameterType.PARAMETER_STRING
+        param.value.string_value = 'full'
+        '''
+        append the service request with the correct parameter message
+        '''
+        request.parameters.append(param)
+        
+        '''
+        wait until the service server is available then send the request
+        '''
+        self.client.wait_for_service()
+        self.future = self.client.call_async(request)
+        self.get_logger().info('Safety limits turned off')
 
 def main(args=None):
     rclpy.init(args=args)
