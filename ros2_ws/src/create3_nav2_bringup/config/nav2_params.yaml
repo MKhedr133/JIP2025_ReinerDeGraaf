@@ -30,7 +30,7 @@ controller_server:
       min_speed_xy: 0.0
       max_speed_xy: 0.10
       min_vel_theta: 0.0
-      max_vel_theta: 1.0
+      max_vel_theta: 0.6
 
       # Accels / decels
       acc_lim_x: 0.9
@@ -41,7 +41,7 @@ controller_server:
       # Trajectory sampling / sim
       vx_samples: 20
       vtheta_samples: 20
-      sim_time: 1.0
+      sim_time: 0.8
       time_granularity: 0.1
       transform_tolerance: 0.3
       short_circuit_trajectory_evaluation: false
@@ -63,15 +63,16 @@ controller_server:
       GoalDist:
         scale: 24.0
       RotateToGoal:
-        scale: 32.0
+        scale: 8.0
       ObstacleFootprint:
-        scale: 0.5
+        scale: 1.0
 
 local_costmap:
   local_costmap:
     ros__parameters:
       use_sim_time: false
       footprint: "[[0.485, 0.195], [0.485, -0.195], [-0.195, -0.195], [-0.195, 0.195]]"
+      transform_tolerance: 0.50
       footprint_padding: 0.03
       global_frame: odom
       robot_base_frame: base_link
@@ -88,7 +89,11 @@ local_costmap:
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: true
+        obstacle_range: 2.5
+        raytrance_range: 3.0
+        inf_is_valid: true
         observation_sources: scan
+        footprint_clearing_enabled: true
         scan:
           topic: /scan
           data_type: LaserScan
@@ -102,10 +107,7 @@ local_costmap:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: true
         cost_scaling_factor: 3.0
-        inflation_radius: 0.3
-
-      footprint: "[[0.485, 0.195], [0.485, -0.195], [-0.195, -0.195], [-0.195, 0.195]]"
-      footprint_padding: 0.03
+        inflation_radius: 0.25
 
 bt_navigator:
   ros__parameters:
@@ -118,8 +120,10 @@ bt_navigator:
 behavior_server:
   ros__parameters:
     use_sim_time: false
-    costmap_topic: "/local_costmap/costmap_raw"
-    footprint_topic: "/local_costmap/footprint"
+    local_costmap_topic: "local_costmap/costmap_raw"
+    global_costmap_topic: "global_costmap/costmap_raw"
+    local_footprint_topic: "local_costmap/published_footprint"
+    global_footprint_topic: "global_costmap/published_footprint"
 
     # Humble expects 'recovery_plugins'
     recovery_plugins: ["spin", "wait", "backup"]
@@ -152,7 +156,7 @@ planner_server:
 
     GridBased:
       plugin: "nav2_navfn_planner/NavfnPlanner"
-      tolerance: 0.5
+      tolerance: 1.0
       use_astar: false
       allow_unknown: true
 
@@ -162,6 +166,7 @@ global_costmap:
       use_sim_time: false
       footprint: "[[0.485, 0.195], [0.485, -0.195], [-0.195, -0.195], [-0.195, 0.195]]"
       footprint_padding: 0.03
+      transform_tolerance: 0.50
       global_frame: map
       robot_base_frame: base_link
       resolution: 0.05
@@ -181,6 +186,9 @@ global_costmap:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: true
         footprint_clearing_enabled: true
+        obstacle_range: 2.5
+        raytrance_range: 3.0
+        inf_is_valid: true
         observation_sources: scan
         scan:
           topic: /scan
