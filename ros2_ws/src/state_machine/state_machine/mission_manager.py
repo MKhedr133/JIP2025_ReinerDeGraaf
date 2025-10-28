@@ -44,6 +44,7 @@ class MissionManager(Node):
         self.cps_topic     = p('cps_topic', '/scintillator/cps').value
         self.cps_trigger   = float(p('cps_trigger', 20.0).value)
         self.frame_id      = p('frame_id', 'map').value
+        self.sweep_enabled = bool(self.declare_parameter('sweep_enabled', True).value)
 
         self.route_source  = p('route_source', 'generated').value   # generated|yaml|list
         self.map_yaml      = p('map_yaml', '/dev/null').value
@@ -275,6 +276,8 @@ class MissionManager(Node):
 
     # ---------- CPS trigger & handoff ----------
     def _on_cps(self, msg: Float32):
+        if not self.sweep_enabled:
+            return
         if self.mode != PATROL:
             return
         if msg.data >= self.cps_trigger:

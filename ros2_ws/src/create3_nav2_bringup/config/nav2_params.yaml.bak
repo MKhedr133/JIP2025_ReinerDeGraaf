@@ -71,8 +71,6 @@ local_costmap:
   local_costmap:
     ros__parameters:
       use_sim_time: false
-      footprint: "[[0.485, 0.195], [0.485, -0.195], [-0.195, -0.195], [-0.195, 0.195]]"
-      footprint_padding: 0.03
       global_frame: odom
       robot_base_frame: base_link
       rolling_window: true
@@ -104,7 +102,7 @@ local_costmap:
         cost_scaling_factor: 3.0
         inflation_radius: 0.3
 
-      footprint: "[[0.485, 0.195], [0.485, -0.195], [-0.195, -0.195], [-0.195, 0.195]]"
+      footprint: [[0.485, 0.195], [0.485, -0.195], [-0.195, -0.195], [-0.195, 0.195]]
       footprint_padding: 0.03
 
 bt_navigator:
@@ -160,8 +158,6 @@ global_costmap:
   global_costmap:
     ros__parameters:
       use_sim_time: false
-      footprint: "[[0.485, 0.195], [0.485, -0.195], [-0.195, -0.195], [-0.195, 0.195]]"
-      footprint_padding: 0.03
       global_frame: map
       robot_base_frame: base_link
       resolution: 0.05
@@ -170,6 +166,7 @@ global_costmap:
       rolling_window: false
       track_unknown_space: true
       always_send_full_costmap: true
+
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
 
       static_layer:
@@ -196,6 +193,9 @@ global_costmap:
         enabled: true
         cost_scaling_factor: 3.0
         inflation_radius: 0.55
+
+      footprint: [[0.485, 0.195], [0.485, -0.195], [-0.195, -0.195], [-0.195, 0.195]]
+      footprint_padding: 0.03
 
 waypoint_follower:
   ros__parameters:
