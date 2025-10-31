@@ -28,14 +28,14 @@ class SearchMovementNode(Node):
         param_defaults = {
             'forward_speed': 0.1,
             'rotation_speed': 0.1,
-            'sweep_rotation_speed': 0.05, # Slower speed for continuous sweep
+            'sweep_rotation_speed': 0.005, # 0.005 is slowest it goes
             'sweep_range_deg': 60.0,
             'sweep_increment_deg': 10.0,
             'sweep_wait_duration': 3.0,
             'threshold_drive': 20.0,
             'threshold_goal': 500.0,
             'forward_duration': 0.5,
-            'min_forward_duration': 0.5,
+            'min_forward_duration': 5.0,
             'max_forward_duration': 5.0,
         }
 
@@ -195,8 +195,8 @@ class SearchMovementNode(Node):
         avg_y = math.sin(self.best_yaw_pass1) + math.sin(self.best_yaw_pass2)
         self.best_yaw = math.atan2(avg_y, avg_x)
 
-        # Use the higher of the two peak CPS values for the forward duration calculation
-        self.best_cps = max(self.best_cps_pass1, self.best_cps_pass2)
+        # Use the average for two values of the two peak CPS values for the forward duration calculation
+        self.best_cps = (self.best_cps_pass1 + self.best_cps_pass2) / 2.0
 
         self.get_logger().info(f"Final averaged best yaw: {math.degrees(self.best_yaw):.1f}°")
         self.state_pub.publish(String(data="REALIGN"))
@@ -204,33 +204,40 @@ class SearchMovementNode(Node):
     def realign_state(self):
         """Rotate robot to best yaw using odometry feedback."""
         if self.rotate_to_yaw(self.best_yaw):
-            # Dynamically calculate forward duration
-            cps_diff = self.threshold_goal - self.best_cps
-            # We use max(0, cps_diff) to avoid negative durations if we overshoot the goal.
-            normalized_diff = max(0.0, cps_diff) / self.threshold_goal
-            # Linearly scale between min_forward_duration and max_forward_duration.
-            dynamic_duration = self.min_forward_duration + (self.max_forward_duration - self.min_forward_duration) * normalized_diff
-
             self.stop_robot()
             self.get_logger().info("Realigned to best yaw → moving forward shortly.")
             self.state_pub.publish(String(data="FORWARD_SHORT"))
-            self.forward_end_time = self.get_clock().now() + rclpy.duration.Duration(seconds=dynamic_duration)
+            
+            self.forward_end_time = self.get_clock().now() + rclpy.duration.Duration(seconds=self.forward_duration)
+
+            if self.last_peak_cps is not None:
+                cps_ratio = float(self.last_peak_cps) / float(self.current_cps)
+                distance_ratio = (cps_ratio)**0.5  # Inverse square law
+                adjusted_duration = self.forward_duration * distance_ratio
+                
+                # Limit the adjusted duration to avoid extreme values
+                adjusted_duration = max(0.1, min(adjusted_duration, self.forward_duration * 2.0))
+
+                self.forward_end_time = self.get_clock().now() + rclpy.time.Duration(seconds=adjusted_duration)
+                self.get_logger().info(f"Adjusting forward duration to: {adjusted_duration:.2f} seconds.")
+            else:
+                self.get_logger().warn("No previous peak CPS recorded.  Using default forward duration.")
 
     def forward_short_state(self):
-        """Move forward a bit toward chosen direction."""
+        """Move forward a bit toward chosen direction, adjusting duration based on inverse square law."""
         if self.get_clock().now() < self.forward_end_time:
             twist = Twist()
             twist.linear.x = self.forward_speed
             self.cmd_pub.publish(twist)
-        else:
-            self.stop_robot()
             if self.current_cps >= self.threshold_goal:
+                self.stop_robot()
                 self.get_logger().info("Goal threshold reached → STOP.")
                 self.state_pub.publish(String(data="STOP"))
-            else:
-                self.get_logger().info("Restarting sweep phase.")
-                self.state_pub.publish(String(data="SWEEP_START"))
-
+        else:
+            self.stop_robot()
+            self.get_logger().info("Restarting sweep phase.")
+            self.state_pub.publish(String(data="SWEEP_START"))
+            
     def stop_state(self):
         self.stop_robot()
         # stay idle

@@ -26,14 +26,14 @@ class SearchMovementNode(Node):
 
         # --- Parameters ---
         param_defaults = {
-            'forward_speed': 0.1,
-            'rotation_speed': 0.1,
+            'forward_speed': 0.2,
+            'rotation_speed': 0.5,
             'sweep_range_deg': 60.0,
             'sweep_increment_deg': 10.0,
-            'sweep_wait_duration': 3.0,
+            'sweep_wait_duration': 4.0,
             'threshold_drive': 20.0,
             'threshold_goal': 500.0,
-            'forward_duration': 0.5,
+            'forward_duration': 10.0,
             'min_forward_duration': 0.5, # New parameter
             'max_forward_duration': 5.0, # New parameter
         }
@@ -57,6 +57,7 @@ class SearchMovementNode(Node):
         self.best_cps = 0.0
         self.forward_end_time = None
         self.timer = self.create_timer(0.05, self.main_loop)
+        self.current_increment_cps_readings = [] # To store CPS readings for the current wait period
         self.motion_timer = None
 
         self.get_logger().info("SearchMovementNode started")
@@ -120,6 +121,8 @@ class SearchMovementNode(Node):
         self.sweep_target_high = self.normalize_angle(self.yaw_start + math.radians(self.sweep_range_deg))
         self.sweep_data = []
         self.target_yaw = self.sweep_target_low
+        self.sweep_wait_end_time = None # Reset wait timer for new sweep
+        self.current_increment_cps_readings = [] # Reset readings for new sweep
         self.state_pub.publish(String(data="SWEEP_ALIGN_LOW"))
 
     def sweep_align_low_state(self):
@@ -128,6 +131,7 @@ class SearchMovementNode(Node):
         if self.rotate_to_yaw(self.target_yaw):
             self.stop_robot()
             self.get_logger().info("Aligned. Starting incremental sweep.")
+            self.sweep_wait_end_time = None # Ensure wait timer is reset for the first wait
             self.state_pub.publish(String(data="SWEEP_WAIT"))
             self.sweep_wait_end_time = self.get_clock().now() + rclpy.duration.Duration(seconds=self.sweep_wait_duration)
 
@@ -137,15 +141,43 @@ class SearchMovementNode(Node):
         if self.rotate_to_yaw(self.target_yaw):
             self.stop_robot()
             self.get_logger().info("Increment reached. Waiting to record data.")
+            self.get_logger().info("Increment reached. Starting wait to record data.")
+            self.sweep_wait_end_time = None # Ensure wait timer is reset for this new increment
             self.state_pub.publish(String(data="SWEEP_WAIT"))
             self.sweep_wait_end_time = self.get_clock().now() + rclpy.duration.Duration(seconds=self.sweep_wait_duration)
 
     def sweep_wait_state(self):
-        """Record data whilst waiting a moment"""
-        if self.get_clock().now() < self.sweep_wait_end_time:
-            self.sweep_data.append((self.current_yaw, self.current_cps))
-            self.get_logger().info(f"Recorded: yaw={math.degrees(self.current_yaw):.1f}°, cps={self.current_cps:.2f}")
-            return
+        """Collect CPS data during the wait period, then record the mean."""
+        current_time = self.get_clock().now()
+
+        # If this is the first time entering SWEEP_WAIT for this increment, initialize
+        if self.sweep_wait_end_time is None:
+            self.sweep_wait_end_time = current_time + rclpy.duration.Duration(seconds=self.sweep_wait_duration)
+            self.current_increment_cps_readings = [] # Initialize list for current increment's readings
+            self.get_logger().info(f"Starting wait for yaw={math.degrees(self.current_yaw):.1f}°")
+
+        # While waiting, continuously collect CPS readings
+        if current_time < self.sweep_wait_end_time:
+            self.current_increment_cps_readings.append(self.current_cps)
+            self.get_logger().debug(f"Collecting CPS: {self.current_cps:.2f} at yaw {math.degrees(self.current_yaw):.1f}°")
+            return # Keep waiting and collecting
+
+        # If we reach here, the wait time is over. Process the collected data.
+        self.stop_robot() # Ensure robot is stopped during evaluation
+
+        if self.current_increment_cps_readings:
+            mean_cps = sum(self.current_increment_cps_readings) / len(self.current_increment_cps_readings)
+            lowest_cps = min(self.current_increment_cps_readings)
+            median_cps = sorted(self.current_increment_cps_readings)[len(self.current_increment_cps_readings) // 2]
+            self.sweep_data.append((self.current_yaw, median_cps))
+            self.get_logger().info(f"Recorded: yaw={math.degrees(self.current_yaw):.1f}°, mean_cps={mean_cps:.2f} (from {len(self.current_increment_cps_readings)} readings)")
+        else:
+            self.get_logger().warning(f"No CPS data collected for yaw={math.degrees(self.current_yaw):.1f}° during wait period. Appending 0.0.")
+            self.sweep_data.append((self.current_yaw, 0.0)) # Append 0 or some default if no data
+
+        # Reset for next increment
+        self.sweep_wait_end_time = None
+        self.current_increment_cps_readings = []
 
         # Check if sweep is complete
         if self.angle_diff(self.sweep_target_high, self.current_yaw) < math.radians(1.0):
@@ -154,6 +186,7 @@ class SearchMovementNode(Node):
         else: # Prepare for next increment
             next_yaw = self.current_yaw + math.radians(self.sweep_increment_deg)
             self.target_yaw = self.normalize_angle(next_yaw)
+            self.get_logger().info(f"Moving to next increment. Target yaw: {math.degrees(self.target_yaw):.1f}°")
             self.state_pub.publish(String(data="SWEEP_INCREMENT"))
 
     def sweep_evaluate_state(self):
@@ -194,6 +227,10 @@ class SearchMovementNode(Node):
             twist = Twist()
             twist.linear.x = self.forward_speed
             self.cmd_pub.publish(twist)
+            if self.current_cps >= self.threshold_goal:
+                self.stop_robot()
+                self.get_logger().info("Goal threshold reached → STOP.")
+                self.state_pub.publish(String(data="STOP"))
         else:
             self.stop_robot()
             if self.current_cps >= self.threshold_goal:
