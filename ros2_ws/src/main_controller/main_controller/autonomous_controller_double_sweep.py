@@ -28,7 +28,7 @@ class SearchMovementNode(Node):
         param_defaults = {
             'forward_speed': 0.1,
             'rotation_speed': 0.1,
-            'sweep_rotation_speed': 0.005, # 0.005 is slowest it goes
+            'sweep_rotation_speed': 0.1, # 0.005 is slowest it goes
             'sweep_range_deg': 60.0,
             'sweep_increment_deg': 10.0,
             'sweep_wait_duration': 3.0,
@@ -54,6 +54,7 @@ class SearchMovementNode(Node):
         self.best_yaw = 0.0
         self.best_cps = 0.0
         self.forward_end_time = None
+        self.last_peak_cps = None
         
         # Continuous sweep variables
         self.best_yaw_pass1 = None
@@ -143,7 +144,7 @@ class SearchMovementNode(Node):
     def sweeping_pass_1_state(self):
         """Continuously rotate from low to high, recording the best CPS."""
         # Check if we have reached the target
-        if abs(self.angle_diff(self.sweep_target_high, self.current_yaw)) < math.radians(2.0):
+        if abs(self.angle_diff(self.sweep_target_high, self.current_yaw)) < math.radians(0.5):
             self.stop_robot()
             self.get_logger().info("Sweep pass 1 finished. Starting pass 2.")
             self.state_pub.publish(String(data="SWEEPING_PASS_2"))
@@ -158,11 +159,12 @@ class SearchMovementNode(Node):
         twist = Twist()
         twist.angular.z = self.sweep_rotation_speed
         self.cmd_pub.publish(twist)
+        self.get_logger().debug(f"Sweeping pass 1: yaw={math.degrees(self.current_yaw):.1f}°, cps={self.current_cps:.2f}")
 
     def sweeping_pass_2_state(self):
         """Continuously rotate from high to low, recording the best CPS."""
         # Check if we have reached the target
-        if abs(self.angle_diff(self.sweep_target_low, self.current_yaw)) < math.radians(2.0):
+        if abs(self.angle_diff(self.sweep_target_low, self.current_yaw)) < math.radians(0.5):
             self.stop_robot()
             self.get_logger().info("Sweep pass 2 finished. Evaluating.")
             self.state_pub.publish(String(data="SWEEP_EVALUATE"))

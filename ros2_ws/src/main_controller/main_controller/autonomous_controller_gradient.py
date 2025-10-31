@@ -59,6 +59,7 @@ class SearchMovementNode(Node):
         self.timer = self.create_timer(0.05, self.main_loop)
         self.current_increment_cps_readings = [] # To store CPS readings for the current wait period
         self.motion_timer = None
+        self.last_peak_cps = None
 
         self.get_logger().info("SearchMovementNode started")
 
