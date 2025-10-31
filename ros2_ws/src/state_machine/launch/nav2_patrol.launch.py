@@ -46,7 +46,7 @@ def generate_launch_description():
                 'resume_patrol_after_sweep': True,      # harmless here
                 # keep these so we only start after you localize:
                 'require_initialpose_click': True,
-                'amcl_convergence_check': True,
+                'amcl_convergence_check': False,
                 'heading_mode': 'align_to_initial_yaw',
                 'snap_heading_to_90deg': True,
             }

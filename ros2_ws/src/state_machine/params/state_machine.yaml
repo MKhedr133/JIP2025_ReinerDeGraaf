@@ -4,7 +4,7 @@
 # - When to hand over to the radiation controller (CPS trigger)
 # - Startup waits & timeouts so we don't race AMCL/Map/Nav2
 
-state_machine:
+mission_manager:
   ros__parameters:
     # === Trigger to switch from Nav2 patrol -> radiation behavior ===
     cps_topic: "/scintillator/cps"
