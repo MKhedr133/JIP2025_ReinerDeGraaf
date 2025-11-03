@@ -28,7 +28,7 @@ import serial
 class ScintillatorRawNode(Node):
     def __init__(self):
         super().__init__("scintillator_raw")
-        self.declare_parameter("port", "/dev/ttyUSB0")
+        self.declare_parameter("port", "/dev/ttyUSB1")
         self.declare_parameter("baud", 19200)
         self.declare_parameter("timeout_s", 1.0)
 
