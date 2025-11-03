@@ -23,6 +23,7 @@ class SearchMovementNode(Node):
         self.cps_sub = self.create_subscription(Float32, '/scintillator/cps', self.cps_callback, 10)
         self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, qos)
         self.state_sub = self.create_subscription(String, '/simba_state', self.state_callback, 10)
+    
 
         # --- Parameters ---
         param_defaults = {
@@ -267,7 +268,7 @@ class SearchMovementNode(Node):
         if abs(yaw_error) > tolerance_rad:
             twist = Twist()
             # Use a slightly faster rotation for alignment
-            twist.angular.z = math.copysign(self.rotation_speed * 5, yaw_error)
+            twist.angular.z = math.copysign(self.rotation_speed, yaw_error)
             self.cmd_pub.publish(twist)
             return False
         else:

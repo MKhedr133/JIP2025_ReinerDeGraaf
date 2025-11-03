@@ -265,7 +265,7 @@ class SearchMovementNode(Node):
         if abs(yaw_error) > tolerance_rad:
             twist = Twist()
             # Use a slightly faster rotation for alignment
-            twist.angular.z = math.copysign(self.rotation_speed * 5, yaw_error)
+            twist.angular.z = math.copysign(self.rotation_speed, yaw_error)
             self.cmd_pub.publish(twist)
             return False
         else:
