@@ -28,9 +28,6 @@ setup(
         'console_scripts': [
             'main_controller = main_controller.main_controller:main',
             'basic = main_controller.autonomous_controller:main',
-            'gradient = main_controller.autonomous_controller_gradient:main',
-            'double_sweep = main_controller.autonomous_controller_double_sweep:main',
-            'gradient_double_sweep = main_controller.autonomous_controller_gradient_double_sweep:main',
         ],
     },
 )

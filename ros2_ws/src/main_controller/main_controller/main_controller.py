@@ -1,23 +1,34 @@
 """
-Main Controller Node
+Main Keyboard-Driven State Controller
 
-This ROS 2 node serves as the main control center of the application. It listens to incoming data from other nodes 
-and makes decisions based on the received information. Specifically, it subscribes to the `/key_input` topic, 
-which provides keyboard inputs, and updates its internal state accordingly.
+This ROS 2 node acts as the primary user interface for controlling the robot's
+high-level operational state via keyboard commands. It listens for specific key
+presses and publishes the corresponding state to the `/simba_state` topic, which
+is then used by other nodes (like the `autonomous_controller`) to trigger
+specific behaviors.
 
 ### Functionality:
-- Subscribes to the `/key_input` topic to receive keyboard inputs.
-- Maintains an internal state (`IDLE` by default).
-- Changes the state to `TRIGGERED` when the `t` key is received.
-- Logs all received inputs and state changes for debugging and monitoring.
+- **State Management**: Translates keyboard inputs into system-wide states.
+  - 'm': Toggles between `IDLE` and `DRIVE` (to start/stop autonomous behavior).
+  - 'y': Enters `EXPERIMENT` mode.
+  - 'h': Returns to `IDLE` mode, stopping all activities.
+- **Odometry Tracking**: In the `EXPERIMENT` state, it uses wheel tick data to
+  calculate and log the distance traveled.
+- **Safety Override**: On startup, it calls a service to disable the robot's
+  built-in safety limits, allowing for unrestricted movement (e.g., driving backward).
 
 ### Subscribed Topics:
-- `/key_input` (std_msgs/String): Receives keyboard inputs as string messages.
+- `/key_input` (std_msgs/String): Receives keyboard commands.
+- `/wheel_ticks` (irobot_create_msgs/msg/WheelTicks): Used for distance tracking.
+
+### Published Topics:
+- `/simba_state` (std_msgs/String): Broadcasts the current system state (e.g., "IDLE", "DRIVE").
+- `/manual_control_enabled` (std_msgs/Bool): Publishes a flag for manual control status (currently static).
 
 ### States:
-- `IDLE`: The initial state of the node.
-- `TRIGGERED`: The state changes to this when the `t` key is received.
-
+- `IDLE`: The default state where the robot is stationary.
+- `DRIVE`: A state that signals the autonomous controller to begin its routine.
+- `EXPERIMENT`: A state for running specific tests, such as distance measurement.
 """
 import rclpy
 from rclpy.node import Node

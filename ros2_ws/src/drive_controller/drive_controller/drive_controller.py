@@ -1,3 +1,31 @@
+"""
+Manual Drive Control Node
+
+This ROS 2 node provides manual teleoperation control for the robot using
+keyboard inputs. It translates specific key presses into velocity commands
+to drive and rotate the robot.
+
+The node's functionality can be enabled or disabled via an external topic,
+allowing other nodes to take control of the robot's movement (e.g., for
+autonomous behavior) and prevent conflicting commands.
+
+### Functionality:
+- **Movement**:
+  - 'w': Move forward
+  - 's': Move backward
+  - 'a': Rotate counter-clockwise (left)
+  - 'd': Rotate clockwise (right)
+- **Speed Adjustment**:
+  - 'r'/'f': Increase/decrease linear speed.
+  - 't'/'g': Increase/decrease angular speed.
+
+### Subscribed Topics:
+- `/key_input` (std_msgs/String): Receives keyboard presses.
+- `/manual_control_enabled` (std_msgs/Bool): A flag to enable or disable the node's operation.
+
+### Published Topics:
+- `/cmd_vel` (geometry_msgs/Twist): Publishes linear and angular velocity commands.
+"""
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String

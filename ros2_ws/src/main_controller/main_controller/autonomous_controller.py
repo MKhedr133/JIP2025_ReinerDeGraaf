@@ -1,3 +1,36 @@
+"""
+Autonomous Controller for Radiation Source Seeking
+
+This ROS 2 node implements a state machine for autonomously navigating a robot
+towards a radiation source. The robot uses a scintillator to measure radiation
+levels (Counts Per Second - CPS) and odometry for navigation.
+
+The core logic is a state machine that executes a search-and-home-in algorithm:
+1.  **DRIVE**: The robot moves forward until a preliminary radiation threshold is detected.
+2.  **SWEEP**: The robot stops and performs a rotational sweep across a defined arc.
+    - It stops at several angular increments.
+    - At each increment, it waits for a fixed duration to collect and average CPS readings.
+3.  **EVALUATE**: After the sweep, it determines the angle (yaw) that yielded the highest CPS reading.
+4.  **REALIGN & ADVANCE**: The robot rotates to face the direction of the highest reading and
+    moves forward for a short duration. The forward duration can be dynamically adjusted
+    based on the change in CPS, approximating an inverse square law relationship to
+    estimate distance to the source.
+5.  **REPEAT**: The sweep-realign-advance cycle repeats, allowing the robot to home in on the source.
+6.  **STOP**: The robot stops when the CPS reading exceeds a final goal threshold, indicating
+    it has reached the source.
+
+The state transitions are managed internally and can be initiated by an external state
+publisher (e.g., setting the state to 'DRIVE').
+
+Subscribed Topics:
+- `/scintillator/cps` (std_msgs/Float32): Radiation counts per second.
+- `/odom` (nav_msgs/Odometry): Robot's position and orientation for heading control.
+- `/simba_state` (std_msgs/String): External state commands to control the node's behavior.
+
+Published Topics:
+- `/cmd_vel` (geometry_msgs/Twist): Publishes velocity commands to move the robot.
+- `/simba_state` (std_msgs/String): Publishes its own internal state transitions.
+"""
 import math
 import rclpy
 from rclpy.node import Node
@@ -23,17 +56,18 @@ class SearchMovementNode(Node):
         self.cps_sub = self.create_subscription(Float32, '/scintillator/cps', self.cps_callback, 10)
         self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, qos)
         self.state_sub = self.create_subscription(String, '/simba_state', self.state_callback, 10)
+    
 
         # --- Parameters ---
         param_defaults = {
-            'forward_speed': 0.1,
-            'rotation_speed': 0.1,
+            'forward_speed': 0.2,
+            'rotation_speed': 0.5,
             'sweep_range_deg': 60.0,
             'sweep_increment_deg': 10.0,
-            'sweep_wait_duration': 3.0,
+            'sweep_wait_duration': 4.0,
             'threshold_drive': 20.0,
             'threshold_goal': 500.0,
-            'forward_duration': 0.5,
+            'forward_duration': 5.0,
             'min_forward_duration': 0.5, # New parameter
             'max_forward_duration': 5.0, # New parameter
         }
@@ -57,7 +91,9 @@ class SearchMovementNode(Node):
         self.best_cps = 0.0
         self.forward_end_time = None
         self.timer = self.create_timer(0.05, self.main_loop)
+        self.current_increment_cps_readings = [] # To store CPS readings for the current wait period
         self.motion_timer = None
+        self.last_peak_cps = None
 
         self.get_logger().info("SearchMovementNode started")
 
@@ -120,6 +156,8 @@ class SearchMovementNode(Node):
         self.sweep_target_high = self.normalize_angle(self.yaw_start + math.radians(self.sweep_range_deg))
         self.sweep_data = []
         self.target_yaw = self.sweep_target_low
+        self.sweep_wait_end_time = None # Reset wait timer for new sweep
+        self.current_increment_cps_readings = [] # Reset readings for new sweep
         self.state_pub.publish(String(data="SWEEP_ALIGN_LOW"))
 
     def sweep_align_low_state(self):
@@ -128,6 +166,7 @@ class SearchMovementNode(Node):
         if self.rotate_to_yaw(self.target_yaw):
             self.stop_robot()
             self.get_logger().info("Aligned. Starting incremental sweep.")
+            self.sweep_wait_end_time = None # Ensure wait timer is reset for the first wait
             self.state_pub.publish(String(data="SWEEP_WAIT"))
             self.sweep_wait_end_time = self.get_clock().now() + rclpy.duration.Duration(seconds=self.sweep_wait_duration)
 
@@ -137,15 +176,43 @@ class SearchMovementNode(Node):
         if self.rotate_to_yaw(self.target_yaw):
             self.stop_robot()
             self.get_logger().info("Increment reached. Waiting to record data.")
+            self.get_logger().info("Increment reached. Starting wait to record data.")
+            self.sweep_wait_end_time = None # Ensure wait timer is reset for this new increment
             self.state_pub.publish(String(data="SWEEP_WAIT"))
             self.sweep_wait_end_time = self.get_clock().now() + rclpy.duration.Duration(seconds=self.sweep_wait_duration)
 
     def sweep_wait_state(self):
-        """Record data whilst waiting a moment"""
-        if self.get_clock().now() < self.sweep_wait_end_time:
-            self.sweep_data.append((self.current_yaw, self.current_cps))
-            self.get_logger().info(f"Recorded: yaw={math.degrees(self.current_yaw):.1f}°, cps={self.current_cps:.2f}")
-            return
+        """Collect CPS data during the wait period, then record the mean."""
+        current_time = self.get_clock().now()
+
+        # If this is the first time entering SWEEP_WAIT for this increment, initialize
+        if self.sweep_wait_end_time is None:
+            self.sweep_wait_end_time = current_time + rclpy.duration.Duration(seconds=self.sweep_wait_duration)
+            self.current_increment_cps_readings = [] # Initialize list for current increment's readings
+            self.get_logger().info(f"Starting wait for yaw={math.degrees(self.current_yaw):.1f}°")
+
+        # While waiting, continuously collect CPS readings
+        if current_time < self.sweep_wait_end_time:
+            self.current_increment_cps_readings.append(self.current_cps)
+            self.get_logger().debug(f"Collecting CPS: {self.current_cps:.2f} at yaw {math.degrees(self.current_yaw):.1f}°")
+            return # Keep waiting and collecting
+
+        # If we reach here, the wait time is over. Process the collected data.
+        self.stop_robot() # Ensure robot is stopped during evaluation
+
+        if self.current_increment_cps_readings:
+            mean_cps = sum(self.current_increment_cps_readings) / len(self.current_increment_cps_readings)
+            lowest_cps = min(self.current_increment_cps_readings)
+            median_cps = sorted(self.current_increment_cps_readings)[len(self.current_increment_cps_readings) // 2]
+            self.sweep_data.append((self.current_yaw, median_cps))
+            self.get_logger().info(f"Recorded: yaw={math.degrees(self.current_yaw):.1f}°, median_cps={mean_cps:.2f} (from {len(self.current_increment_cps_readings)} readings)")
+        else:
+            self.get_logger().warning(f"No CPS data collected for yaw={math.degrees(self.current_yaw):.1f}° during wait period. Appending 0.0.")
+            self.sweep_data.append((self.current_yaw, 0.0)) # Append 0 or some default if no data
+
+        # Reset for next increment
+        self.sweep_wait_end_time = None
+        self.current_increment_cps_readings = []
 
         # Check if sweep is complete
         if self.angle_diff(self.sweep_target_high, self.current_yaw) < math.radians(1.0):
@@ -154,6 +221,7 @@ class SearchMovementNode(Node):
         else: # Prepare for next increment
             next_yaw = self.current_yaw + math.radians(self.sweep_increment_deg)
             self.target_yaw = self.normalize_angle(next_yaw)
+            self.get_logger().info(f"Moving to next increment. Target yaw: {math.degrees(self.target_yaw):.1f}°")
             self.state_pub.publish(String(data="SWEEP_INCREMENT"))
 
     def sweep_evaluate_state(self):
@@ -173,38 +241,39 @@ class SearchMovementNode(Node):
     def realign_state(self):
         """Rotate robot to best yaw using odometry feedback."""
         if self.rotate_to_yaw(self.best_yaw):
-            # Dynamically calculate forward duration
-            # The closer we are to the goal, the shorter the duration.
-            # The farther away, the longer the duration.
-            cps_diff = self.threshold_goal - self.best_cps
-            # Scale the duration. Let's say max duration is 2s and min is 0.2s.
-            # We use max(0, cps_diff) to avoid negative durations if we overshoot the goal.
-            normalized_diff = max(0.0, cps_diff) / self.threshold_goal
-            # Linearly scale between min_forward_duration and max_forward_duration.
-            dynamic_duration = self.min_forward_duration + (self.max_forward_duration - self.min_forward_duration) * normalized_diff
-
             self.stop_robot()
             self.get_logger().info("Realigned to best yaw → moving forward shortly.")
             self.state_pub.publish(String(data="FORWARD_SHORT"))
-            self.forward_end_time = self.get_clock().now() + rclpy.duration.Duration(seconds=dynamic_duration)
+            
+            self.forward_end_time = self.get_clock().now() + rclpy.duration.Duration(seconds=self.forward_duration)
+
+            if self.last_peak_cps is not None:
+                cps_ratio = float(self.last_peak_cps) / float(self.current_cps)
+                distance_ratio = (cps_ratio)**0.5  # Inverse square law
+                adjusted_duration = self.forward_duration * distance_ratio
+                
+                # Limit the adjusted duration to avoid extreme values
+                adjusted_duration = max(0.1, min(adjusted_duration, self.forward_duration * 2.0))
+
+                self.forward_end_time = self.get_clock().now() + rclpy.time.Duration(seconds=adjusted_duration)
+                self.get_logger().info(f"Adjusting forward duration to: {adjusted_duration:.2f} seconds.")
+            else:
+                self.get_logger().warn("No previous peak CPS recorded.  Using default forward duration.")
 
     def forward_short_state(self):
-        """Move forward a bit toward chosen direction."""
+        """Move forward a bit toward chosen direction, adjusting duration based on inverse square law."""
         if self.get_clock().now() < self.forward_end_time:
             twist = Twist()
             twist.linear.x = self.forward_speed
             self.cmd_pub.publish(twist)
-        else:
-            self.stop_robot()
             if self.current_cps >= self.threshold_goal:
+                self.stop_robot()
                 self.get_logger().info("Goal threshold reached → STOP.")
                 self.state_pub.publish(String(data="STOP"))
-            else:
-                self.get_logger().info("Restarting sweep phase.")
-                self.state_pub.publish(String(data="SWEEP_START"))
-
-
-    
+        else:
+            self.stop_robot()
+            self.get_logger().info("Restarting sweep phase.")
+            self.state_pub.publish(String(data="SWEEP_START"))
 
 
     def stop_state(self):
@@ -232,7 +301,7 @@ class SearchMovementNode(Node):
         if abs(yaw_error) > tolerance_rad:
             twist = Twist()
             # Use a slightly faster rotation for alignment
-            twist.angular.z = math.copysign(self.rotation_speed * 5, yaw_error)
+            twist.angular.z = math.copysign(self.rotation_speed, yaw_error)
             self.cmd_pub.publish(twist)
             return False
         else:

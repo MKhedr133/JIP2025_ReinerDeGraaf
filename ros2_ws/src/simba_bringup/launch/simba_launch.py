@@ -11,15 +11,15 @@ import os
 def generate_launch_description():
     return LaunchDescription([
         # # Launch Create3 simulation in Gazebo (Classic)
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                PathJoinSubstitution([
-                    FindPackageShare('irobot_create_gazebo_bringup'),
-                    'launch',
-                    'create3_gazebo.launch.py'
-                ])
-            )
-        ),
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource(
+        #         PathJoinSubstitution([
+        #             FindPackageShare('irobot_create_gazebo_bringup'),
+        #             'launch',
+        #             'create3_gazebo.launch.py'
+        #         ])
+        #     )
+        # ),
 
         # Launch the keyboard listener node
         IncludeLaunchDescription(

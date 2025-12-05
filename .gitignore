@@ -9,12 +9,6 @@ test_results/
 # create3 sim
 ros2_ws/src/create3_sim
 
-# RViz / maps / sim artifacts (keep if you don't want these tracked)
-*.rviz
-*.pgm
-*.yaml
-*.world
-*.model
 
 # Python
 __pycache__/
