@@ -3,6 +3,15 @@
 Autonomous navigation + radiation sensing robot built with **ROS 2 Humble**.  
 Includes Nav2, SLAM, and drivers for sensors like the LB-124 scintillator.
 
+## Packages
+- **`simba_bringup`**: Contains the main launch files to start the robot and its various operational modes.
+- **`main_controller`**: Manages the robot's high-level state and contains the autonomous search method.
+- **`drive_controller`**: Handles manual teleoperation of the robot via keyboard inputs (w, a, s, d).
+- **`keyboard_listener`**: Captures raw keyboard presses and publishes them to a ROS 2 topic for other nodes to use.
+- **`scintillator_lb124`**: Interfaces with the Berthold LB124 Scintillator.
+- **`create3_sim`**: Provides gazebo simulation of iRobot Create 3
+
+
 ## Quickstart
 
 ```bash
@@ -18,15 +27,21 @@ colcon build --symlink-install
 source install/setup.bash
 
 #run everything with
-ros2 launch simba_bringup simba_launch.py
+ros2 launch simba_bringup simba_launch.py autonomy_mode:=basic
+
 ```
 
 ## Keyboard controls
 w a s d for tank-control style movement
+
 r and f to increase/decrease linear speed
+
 t and g to increase/decrease angular speed
+
 y to set roomba to "EXPERIMENT" state. Some metrics will be counted and displayed in console in this state (at the moment: /odom and /wheel_tick data)
+
 h to set roomba to "IDLE" state
+
 m to toggle manual controls (ON by default)
 
 ## ROS Topic list
